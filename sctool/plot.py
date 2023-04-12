@@ -11,6 +11,8 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from sctool import query
+from toolbox.stats.basic import ecdf
 
 def gene_by_label(df,gene,label,ax=None,callback=None,show=True,**kwargs):
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,5))
@@ -26,4 +28,4 @@ def scatter(x,y,ax=None,show=True,**kwargs):
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(5,5))
     ax.scatter(x,y,s=5,c='k')#,label='High variable genes')
     if show: plt.show()
-
+     

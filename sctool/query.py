@@ -12,9 +12,12 @@
 import scipy.sparse as sp
 import numpy as np
 import pandas as pd
+from scipy import stats
+from collections import namedtuple
 
 import toolbox.matrix_properties as mp
 from sctool import scale
+from sctool.feature_selection import hvg_seurat3
 
 def matrix_rows(X,idx):
     if sp.issparse(X): 
@@ -59,9 +62,9 @@ def cell_total_counts(sc,genes=None):
     if genes is not None:
         jdx = sc.get_gene_index(genes)
         X = matrix_cols(sc.X,jdx)
-        csum = mp.axis_counts(X,axis=1)
+        csum = mp.axis_sum(X,axis=1)
     else:
-        csum = mp.axis_counts(sc.X,axis=1)
+        csum = mp.axis_sum(sc.X,axis=1)
 
     return csum
 
@@ -74,6 +77,42 @@ def qc_cell_total_count(sc,genes=None,thresh=0,label='qc_total_count'):
     x[x > 0] = 1
     x = x.astype(int)
     sc.cells[label] = x
+
+def qc_residual_filter(sc,x,y,thresh=-2,label='qc_residual_filter'):
+    slope, intercept, r, p, std_err = stats.linregress(x, y)
+    resid = y - (slope* x + intercept)
+    rnorm = np.divide(resid - np.mean(resid), np.std(resid))
+    if thresh < 0: 
+        resid[rnorm < thresh] = 0
+        resid[rnorm >= thresh] = 1
+    else:
+        resid[rnorm > thresh] = 0
+        resid[rnorm <= thresh] = 1
+    
+    resid = resid.astype(int)
+    sc.cells[label] = resid
+    RF = namedtuple("Residual", "slope intercept r p std_err")
+    sc.residual_filter = RF(slope,intercept,r,p,std_err) 
+
+def qc_mean_var_hvg(sc,num_hvg=1000,label='qc_hvg'):
+    idx, model = hvg_seurat3(sc,return_model=True) 
+    hvg = np.zeros(sc.X.shape[1],dtype=int)
+    hvg[idx[:num_hvg]] = 1
+    sc.genes[label] = hvg
+    sc.hvg_model = model
+
+def gene_mean_filter(sc,thresh,label='qc_gene_mean'):
+    mu = mp.axis_mean(sc.X,axis=0,skip_zeros=False)
+    mu[mu < thresh] = 0
+    mu[mu > 0 ] = 1
+    sc.genes[label] = mu
+
+def gene_zero_count_filter(sc,thresh,label='qc_zero_count'):
+    mu = mp.axis_elements(sc.X,axis=0)
+    mu[mu < thresh] = 0
+    mu[mu > 0 ] = 1
+    sc.genes[label] = mu
+    
 
 def label_gene_counts(sc,genes,labels,key=None,std_scale=False):
     """

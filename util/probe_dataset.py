@@ -17,47 +17,54 @@ import matplotlib.pyplot as plt
 import inspect
 
 
-from sctool.sc_extension import SCFeatureSelect as SingleCell
-from sctool import explore
+from sctool import explore,util
 
+CONFIG = 'config.ini'
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    
-    parser.add_argument('config',
+
+    parser.add_argument('dataset',
                 action = 'store',
-                help = 'Config file')
-
-   
-    parser.add_argument('mode',
-                        action = 'store',
-                        choices = dir(explore) + [t for (t,o) in getmembers(sys.modules[__name__]) if isfunction(o)],
-                        help = 'Function call')
-   
-    parser.add_argument('--filter_level',
-                        dest='filter_level',
-                        action = 'store',
-                        default = -1,
-                        required = False,
-                        type = int,
-                        help = 'Keep cells with filter_level above value')
-
-    parser.add_argument('-nz',
-                    dest='nz',
-                    action = 'store_true',
-                    default = False, 
-                    required = False,
-                    help = 'If flag, skip zeros') 
+                help = 'Dataset alias in config file')
     
-    parser.add_argument('--display_off',
-                    dest='display_off',
-                    action = 'store_true',
-                    default = False, 
-                    required = False,
-                    help = 'If flag, do not display plot') 
-
-
+    parser.add_argument('--call',
+                        action = 'store',
+                        dest = 'fn_call',  
+                        default = None, 
+                        choices = [t for (t,o) in getmembers(explore) if isfunction(o)],
+                        required = False, 
+                        help = 'Function call')
+ 
+    parser.add_argument('-c','--config',
+                dest = 'config',
+                action = 'store',
+                default = CONFIG,
+                required = False,
+                help = 'Config file')
+    
+    parser.add_argument('--load_light',
+                dest = 'load_light',
+                action = 'store_true',
+                default = False,
+                required = False,
+                help = 'If true, loads the meta data but not the count matrix.')
+    
+    parser.add_argument('--no_display',
+                dest = 'no_display',
+                action = 'store_true',
+                default = False,
+                required = False,
+                help = 'If true, then do not display plots')
+    
+    parser.add_argument('--log_scale',
+                dest = 'log_scale',
+                action = 'store_true',
+                default = False,
+                required = False,
+                help = 'If true, then apply log scale')
+    
     parser.add_argument('-o',
                         dest='fout',
                         action = 'store',
@@ -65,18 +72,27 @@ if __name__=="__main__":
                         required = False,
                         help = 'Output file')
 
-    params = parser.parse_args()
+    args = parser.parse_args()
     
-    sc = SingleCell(params.config)
-    sc.params = params
-    
-    print('Initial shape:',sc.X.shape)
-    if params.filter_level > -1:
-        sc.filter_cells_gte('filter_level',params.filter_level)
-    print('Cell filter:',sc.X.shape)
-    
-    fig,ax = plt.subplots(1,1,figsize=(10,10))
-    getattr(explore,params.mode)(sc,ax=ax)
-    if not sc.fig_saved and params.fout: plt.savefig(params.fout) 
-    if not params.display_off: plt.show()
+    print(f'Loading dataset {args.dataset}')
+    cfg = util.checkout(args.config,args.dataset)
+    sc = util.load_sc(cfg,load_light=args.load_light)
+   
+    while True:
+        fn = args.fn_call
+        if fn is None: fn = input("Enter to function or exit: ").strip()
+        if fn == "switch_log": 
+            args.log_scale = not args.log_scale
+            continue
+        if fn == "exit": break
+        
+        try:
+            fig,ax = plt.subplots(1,1,figsize=(5,5))
+            getattr(explore,fn)(sc,ax=ax,log_scale=args.log_scale)
+            #if not sc.fig_saved and params.fout: plt.savefig(params.fout) 
+            if not args.no_display: plt.show()
+        except:
+            print("Function call not found")
+            
+        args.fn_call = None
 

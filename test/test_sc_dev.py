@@ -15,10 +15,13 @@ from inspect import getmembers,isfunction
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+from scipy import stats
+from scipy import sparse
 
 from sctool import util,scale,plot,query,qc
+from sctool.feature_selection import hvg_seurat3
 from sctool.sc import SingleCell as SC
-from sctool.feature_selection import fit_loess
+import toolbox.matrix_properties as mp
 
 CONFIG = 'config.ini'
 TORDER = [
@@ -76,6 +79,13 @@ def qc_ecdf_cell_total_counts(args):
     sc = util.load_sc(cfg,load_light=False)
     qc.ecdf_cell_total_counts(sc)
 
+def qc_ecdf_gene_elements(args):
+    cfg = util.checkout(args.config,args.dataset)
+    sc = util.load_sc(cfg,load_light=False)
+    gnz = np.log2(mp.axis_elements(sc.X,axis=0))
+    qc.plot_ecdf(gnz,xlabel='# cells with gene')
+    plt.show()
+
 def qc_cell_total_counts(args):
     thresh = 6.5
     cfg = util.checkout(args.config,args.dataset)
@@ -84,6 +94,7 @@ def qc_cell_total_counts(args):
     fig,ax = plt.subplots(1,1,figsize=(5,5))
     qc.ecdf_cell_total_counts(sc,ax=ax,show=False)
     ax.axvline(x=thresh,color='r',linestyle='--') 
+    plt.savefig('data/packer2019/qc_total_counts.svg')
     plt.show()
 
 def qc_mitochondria_total_counts(args):
@@ -95,6 +106,7 @@ def qc_mitochondria_total_counts(args):
     fig,ax = plt.subplots(1,1,figsize=(5,5))
     qc.ecdf_cell_total_counts(sc,genes=sc.gene_list,ax=ax,show=False)
     ax.axvline(x=thresh,color='r',linestyle='--') 
+    plt.savefig('data/packer2019/qc_mt_counts.svg')
     plt.show()
 
 def plot_mitochondria_qc(args):
@@ -116,17 +128,127 @@ def plot_mitochondria_qc(args):
     x = np.log(x+1)
     y = np.log(y+1)
     print(x.min())
-    idx, model = fit_loess(sc,x,y,return_model=True,axis=1) 
-    num_hvg = 1000 
+    [slope, intercept, r, p, std_err] = query.qc_residual_filter(sc,x,y,thresh=-2,label='qc_mt')
+    _x = np.linspace(x.min(),x.max(),100)
+    _y = slope * _x + intercept
+    sc.cells['total_count'] = x
+    sc.cells['mt_count'] = y
+
+    fig,ax = plt.subplots(1,1,figsize=(5,5)) 
+    cdict = {0:'r',1:'#9f9f9f'} 
+    sns.scatterplot(sc.cells,ax=ax,x='total_count',y='mt_count',hue='qc_mt',palette=cdict,s=10)
+    ax.plot(_x,_y,c='k')
+    plt.savefig('data/packer2019/qc_mt.png')
+    plt.show() 
+
+def plot_poisson(args):
+    cfg = util.checkout(args.config,args.dataset)
+    sc = util.load_sc(cfg,load_light=False)
+    sc.load_gene_list('mitochondria')
+    query.qc_cell_total_count(sc,thresh=6.5)
+    query.qc_cell_total_count(sc,genes=sc.gene_list,thresh=2,label='qc_mt_count')
+    print(sc.X.shape)
+    sc.filter_cells_eq('qc_total_count',1)
+    print(sc.X.shape)
+    sc.filter_cells_eq('qc_mt_count',1)
+    print(sc.X.shape)
+    x = query.cell_total_counts(sc)
+    y = query.cell_total_counts(sc,genes=sc.gene_list)
+    x = np.log(x+1)
+    y = np.log(y+1)
+    query.qc_residual_filter(sc,x,y,thresh=-2,label='qc_mt_resid')
+    sc.cells['total_count'] = x
+    sc.cells['mt_count'] = y
+    sc.filter_cells_eq('qc_mt_resid',1)
+    print(sc.X.shape)
+    query.gene_mean_filter(sc,0.1,label='qc_gene_mean')
+    query.gene_zero_count_filter(sc,0.1*sc.X.shape[0],label='qc_gene_zero_count')
+    sc.filter_genes_bool('qc_gene_mean',1)
+    sc.filter_genes_bool('qc_gene_zero_count',1)
+    print(sc.X.shape)
+
+    mu = mp.axis_mean(sc.X,axis=0,skip_zeros=False)
+    num_z = sc.X.shape[0] - mp.axis_elements(sc.X,axis=0)
+    
+    mean,var = mp.axis_mean_var(sc.X,axis=0)
+    cv2 = np.divide(var,np.power(mean,2))
+    x,y = np.log2(mean),np.log2(cv2)
+    thresh = 1 
+    slope, intercept, r, p, std_err = stats.linregress(x, y)
+    resid = y - (slope* x + intercept)
+    rstd = np.std(resid)
+    rnorm = np.divide(resid - np.mean(resid), np.std(resid))
+    resid[rnorm < thresh] = 0
+    resid[rnorm >= thresh] = 1
+    yes = np.where(resid == 1)[0]
+    no = np.where(resid==0)[0]
+    _x = np.linspace(x.min(),x.max(),100)
+    _y = slope * _x + intercept + thresh*rstd
+
+    print(mu.shape,num_z.shape)
+    print(len(yes))
+    fig,ax = plt.subplots(1,1,figsize=(5,5))
+    ax.scatter(np.log2(mu),num_z,s=5)
+    ax.set_xlabel('log2(mean)',fontsize=10)
+    ax.set_ylabel('# 0 counts',fontsize=10)
+    plt.savefig('data/packer2019/poisson_1.svg')
+
+    fig,ax = plt.subplots(1,1,figsize=(5,5))
+    ax.scatter(x[yes],y[yes],s=5,color='k')
+    ax.scatter(x[no],y[no],s=5,color='#9f9f9f')
+    ax.plot(_x,_y,'r') 
+    ax.set_xlabel('log2(mean)',fontsize=10)
+    ax.set_ylabel('log2(CV2)',fontsize=10)
+    plt.savefig('data/packer2019/poisson_2.svg')
+
+
+    plt.show()
+
+def quick_test(args):
+    z = np.array([[1,1,0],[0,1000,0],[0,0,0]])
+    A = sparse.csr_matrix(z)
+    nz = mp.axis_elements(A,axis=0)
+    zz = A.shape[0] - nz
+
+    print(nz)
+    print(zz)
+
+def gene_mean_var(args):
+    cfg = util.checkout(args.config,args.dataset)
+    sc = util.load_sc(cfg,load_light=False)
+    sc.load_gene_list('mitochondria')
+    query.qc_cell_total_count(sc,thresh=6.5)
+    query.qc_cell_total_count(sc,genes=sc.gene_list,thresh=2,label='qc_mt_count')
+    print(sc.X.shape)
+    sc.filter_cells_eq('qc_total_count',1)
+    print(sc.X.shape)
+    sc.filter_cells_eq('qc_mt_count',1)
+   
+
+    num_hvg = 2000 
+    eps = 1e-5
+    idx, model = hvg_seurat3(sc,return_model=True) 
     hvg_0 = idx[:num_hvg]
     hvg_1 = idx[num_hvg:]
-    #print(x.min())
+    
+    mean,var = mp.axis_mean_var(sc.X,axis=0,skip_zeros=False) 
+    x = np.log10(mean[var>0])
+    y = np.log10(var[var>0])
     _x = np.linspace(x.min(),x.max(),100)
     _y = model.predict(_x).values
-    fig,ax = plt.subplots(1,1,figsize=(10,10)) 
-    ax.plot(_x,_y,c='k')
+    fig,ax = plt.subplots(1,1,figsize=(5,5))
+    x,y = np.log10(mean[hvg_0]),np.log10(var[hvg_0])
+    ax.scatter(x,y,s=5,c='r',label='High variable genes')
+    x,y = np.log10(mean[hvg_1]+eps),np.log10(var[hvg_1]+eps)
     ax.scatter(x,y,s=5,c='#9f9f9f',alpha=0.5)
-    #ax.scatter(x[hvg_0],y[hvg_0],s=5,c='r',label='Low MT')
+    ax.plot(_x,_y,c='k')
+    ax.legend(loc='upper left',fontsize=8)
+    xlabel= 'gene mean'
+    ylabel = 'gene var'
+    ax.set_xlabel(xlabel,fontsize=6)
+    ax.set_ylabel(ylabel,fontsize=6)
+    ax.tick_params(axis='x',labelsize=4)
+    ax.tick_params(axis='y',labelsize=4)
     plt.show()
 
 def query_gene_counts(args):

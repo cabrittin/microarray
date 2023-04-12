@@ -13,20 +13,88 @@ import numpy as np
 import inspect
 import matplotlib.pyplot as plt
 import scipy.stats
+import seaborn as sns
 
-from toolbox.plots import plot_multi_pages
+#from toolbox.plots import plot_multi_pages
 import toolbox.matrix_properties as mp
 from toolbox.stats.basic import ecdf
 from toolbox.scale import standardize
 from sctool.feature_selection import hvg_seurat3
+from sctool import query
 import sctool.decomposition as decomp
 
-def gene_count(sc,ax=None,**kwargs):
-    #if not sc.log_scale: sc.X.data = np.log(sc.X.data)
-    sc.X.data = np.log(sc.X.data)
-    data = mp.axis_counts(sc.X,axis=0) 
-    plot_ecdf(data,ax=ax,xlabel=f"log({inspect.stack()[0][3]})",
-            reverse=True,plot_params=sc.plot_params,**kwargs)
+
+def sum_of_gene_counts(sc,ax=None,log_scale=True,reverse=False,**kwargs):
+    data = mp.axis_sum(sc.X,axis=0) 
+    xlabel = f"{inspect.stack()[0][3]}"
+    
+    if log_scale:
+        data = np.log(data)
+        xlabel = f"log({inspect.stack()[0][3]})"
+    
+    plot_ecdf(data,ax=ax,xlabel=xlabel,
+            reverse=reverse,plot_params=sc.cfg['plot_params'])
+
+def sum_of_cell_counts(sc,genes=None,ax=None,log_scale=True,reverse=False,**kwargs):
+    data = query.cell_total_counts(sc,genes=genes)
+    xlabel = f"{inspect.stack()[0][3]}"
+    
+    if log_scale:
+        data = np.log(data)
+        xlabel = f"log({inspect.stack()[0][3]})"
+    
+    plot_ecdf(data,ax=ax,xlabel=xlabel,
+            reverse=reverse,plot_params=sc.cfg['plot_params'],**kwargs)
+
+def sum_of_nonzero_genes(sc,ax=None,log_scale=True,reverse=False,**kwargs):
+    data = mp.axis_elements(sc.X,axis=1) 
+    xlabel = f"{inspect.stack()[0][3]}"
+    
+    if log_scale:
+        data = np.log(data)
+        xlabel = f"log({inspect.stack()[0][3]})"
+    
+    plot_ecdf(data,ax=ax,xlabel=xlabel,
+            reverse=reverse,plot_params=sc.cfg['plot_params'],**kwargs)
+
+def gene_subset_vs_all_count(sc,gene_list,ax=None,log_scale=True,**kwargs):
+    if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10)) 
+    x = query.cell_total_counts(sc)
+    y = query.cell_total_counts(sc,genes=sc.gene_list)
+    xlabel,ylabel = 'all_gene_count','sub_gene_count'  
+    if log_scale:
+        x = np.log(x+1)
+        y = np.log(y+1)
+        xlabel,ylabel = 'log(all_gene_count)','log(sub_gene_count)'  
+    
+    ax.scatter(x,y,s=5,c='#9f9f9f')
+    __plot_labels__(ax,xlabel,ylabel,sc.cfg['plot_params'])
+
+def residual_filter(sc,x,y,hue,ax=None,**kwargs):
+    if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10)) 
+    _x = np.linspace(sc.cells[x].min(),sc.cells[x].max(),100)
+    _y = sc.residual_filter.slope * _x + sc.residual_filter.intercept
+    cdict = {0:'r',1:'#9f9f9f'} 
+    sns.scatterplot(sc.cells,ax=ax,x=x,y=y,hue=hue,palette=cdict,s=10)
+    ax.plot(_x,_y,c='k')
+
+def hvg_mean_var(sc,label='qc_hvg',ax=None,**kwargs):
+    if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10))
+    eps = 1e-5
+    mean,var = mp.axis_mean_var(sc.X,axis=0,skip_zeros=False) 
+    sc.genes['mean'] = np.log10(mean+eps)
+    sc.genes['var'] = np.log10(var+eps)
+    x = np.log10(mean[var>0])
+    _x = np.linspace(x.min(),x.max(),100)
+    _y = sc.hvg_model.predict(_x).values
+    cdict = {1:'r',0:'#9f9f9f'} 
+    sns.scatterplot(sc.genes,x='mean',y='var',hue=label,palette=cdict,ax=ax,s=5)
+    ax.plot(_x,_y,c='k')
+    xlabel= 'gene mean'
+    ylabel = 'gene var'
+    __plot_labels__(ax,xlabel,ylabel,sc.cfg['plot_params'])
+
+""" Deprecated below here """
 
 def gene_mean(sc,ax=None,**kwargs):
     if not sc.log_scale: sc.X.data = np.log(sc.X.data)
@@ -44,27 +112,6 @@ def gene_dispersion(sc,ax=None,**kwargs):
     plot_ecdf(data,ax=ax,xlabel=xlabel,
             reverse=True,plot_params=sc.plot_params,**kwargs)
 
-def gene_mean_var(sc,ax=None,num_hvg=2000,**kwargs):
-    eps = 1e-5
-    idx, model = hvg_seurat3(sc,return_model=True) 
-    hvg_0 = idx[:num_hvg]
-    hvg_1 = idx[num_hvg:]
-    
-    mean,var = mp.axis_mean_var(sc.X,axis=0,skip_zeros=False) 
-    x = np.log10(mean[var>0])
-    y = np.log10(var[var>0])
-    _x = np.linspace(x.min(),x.max(),100)
-    _y = model.predict(_x).values
-    if ax is None: fig,ax = plt.subplots(1,1,figsize=(5,5))
-    x,y = np.log10(mean[hvg_0]),np.log10(var[hvg_0])
-    ax.scatter(x,y,s=5,c='r',label='High variable genes')
-    x,y = np.log10(mean[hvg_1]+eps),np.log10(var[hvg_1]+eps)
-    ax.scatter(x,y,s=5,c='#9f9f9f',alpha=0.5)
-    ax.plot(_x,_y,c='k')
-    ax.legend(loc='upper left',fontsize=8)
-    xlabel= 'gene mean'
-    ylabel = 'gene var'
-    __plot_labels__(ax,xlabel,ylabel,sc.plot_params)
 
 def gene_cell_count_vs_dispersion(sc,ax=None,**kwargs):
     ylabel = ['log2(dispersion)','log2(dispersion_nz)'][int(sc.params.nz)]
@@ -189,17 +236,17 @@ def plot_cell_ecdf(ax,data,label,reverse=False):
 
 def plot_ecdf(data,ax=None,xlabel=None,reverse=False,plot_params=None):
     ylabel = ['ECDF','1-ECDF'][int(reverse)]
-    if ax is None: fig,ax = plt.subplots(1,1,figsize=(5,5))
+    if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10))
     x,y = ecdf(data,reverse=reverse)
     ax.plot(x,y)
     __plot_labels__(ax,xlabel,ylabel,plot_params)
     
 def __plot_labels__(ax,xlabel,ylabel,params):
     try:
-        ax.set_xlabel(xlabel,fontsize=params['labels']['x_size'])
-        ax.set_ylabel(ylabel,fontsize=params['labels']['y_size'])
-        ax.tick_params(axis='x',labelsize=params['ticks']['x_size'])
-        ax.tick_params(axis='y',labelsize=params['ticks']['y_size'])
+        ax.set_xlabel(xlabel,fontsize=params['x_label_size'])
+        ax.set_ylabel(ylabel,fontsize=params['y_label_size'])
+        ax.tick_params(axis='x',labelsize=params['x_tick_size'])
+        ax.tick_params(axis='y',labelsize=params['y_tick_size'])
     except:
         ax.set_xlabel(xlabel,fontsize=6)
         ax.set_ylabel(ylabel,fontsize=6)

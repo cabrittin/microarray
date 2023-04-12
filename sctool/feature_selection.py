@@ -63,28 +63,3 @@ def hvg_seurat3(sc,return_model=False,num_genes=0):
         return idx
 
 
-def fit_loess(sc,x,y,return_model=False,num_genes=0,axis=0):
-    ## Fit loess
-    estimate_var = np.zeros(sc.X.shape[1-axis], dtype=np.float64)
-    model = loess(x, y, span=0.3, degree=2)
-    model.fit()
-    #estimate_var[not_const] = model.outputs.fitted_values
-    estimate_var = model.outputs.fitted_values
-    reg_std = np.sqrt(10 ** estimate_var)
-    
-    ## Clip values
-    #N = sc.X.shape[0] 
-    #clip_val = reg_std * np.sqrt(N) + mean
-    #batch_counts = mp.axis_clip_value(sc.X,clip_val,axis=axis)
-    
-    ## Variance of standardized values
-    norm_gene_var = mp.var_of_user_standardized_values(sc.X,reg_std,axis=axis) 
-    idx = np.argsort(norm_gene_var)[::-1]
-
-    if num_genes > 0: idx = idx[:num_genes]
-    if return_model:
-        return idx, model
-    else:
-        return idx
-
-

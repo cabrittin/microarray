@@ -10,6 +10,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from skmisc.loess import loess
 
 from sctool import query
 from toolbox.stats.basic import ecdf
@@ -27,7 +28,14 @@ def plot_ecdf(data,ax=None,xlabel=None,reverse=False,plot_params=None,**kwargs):
     x,y = ecdf(data,reverse=reverse)
     ax.plot(x,y,**kwargs)
     __plot_labels__(ax,xlabel,ylabel,plot_params)
-    
+   
+
+def plot_loss_fit(x,y,ax=None,xlabel=None,ylabel=None,**kwargs):
+    if ax is None: fig,ax = plt.subplots(1,1,figsize=(5,5))
+
+
+
+
 def __plot_labels__(ax,xlabel,ylabel,params):
     ax.set_xlabel(xlabel,fontsize=12)
     ax.set_ylabel(ylabel,fontsize=12)
