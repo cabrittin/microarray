@@ -13,7 +13,7 @@ import numpy as np
 import time
 import pandas as pd
 
-import sctool.feature_selection
+from pycsvparser import read
 
 class SingleCell:
     def __init__(self,cfg,load_light=False):
@@ -51,23 +51,14 @@ class SingleCell:
         self.cfg = cfg 
         self.gene_key = self.cfg['keys']['meta_key_gene']
         self.cell_key = self.cfg['keys']['meta_key_cell']
-        #self.time_key = cfg['meta_keys']['time']
-        #self.batch_key = cfg['meta_keys']['batch']
         self.load_light = load_light
         self.restore_data()
-        
+        self.gene_list = []
+        self.meta = {}
+
         """
-        self.on_device = False
-        self.is_log_standardized = False
-        self.fig_saved = False
         self.gene_idx = None
         self.cell_idx = None
-
-        try:
-            self.plot_params = ConfigParser(interpolation=ExtendedInterpolation()) 
-            self.plot_params.read(self.cfg['files']['plot_params'])
-        except:
-            print("WARNING:::Plot params config file not found. Default parameters will be used.")
         """
 
     def restore_data(self):
@@ -78,6 +69,24 @@ class SingleCell:
         self.genes = pd.read_csv(self.cfg['files']['genes_meta'])
         if not self.load_light: self.load_matrices()
     
+    def load_gene_list(self,lstname):
+        """
+        Convenience function for cacheing a list of genes
+
+        Args:
+        -----
+        lstname: string
+            path to gene list text file
+        """
+        self.gene_list = read.into_list(self.cfg['gene_list'][lstname])
+    
+    def backup_count_matrix(self):
+        self._X = self.X.copy()
+   
+    def set_count_matrix(self,X,backup=True):
+        if backup: self.backup_count_matrix()
+        self.X = X
+
     def save_cells(self,fout):
         fout = self.cfg['files']['top_dir'] + '/' + fout
         self.cells.to_csv(fout,index=False) 

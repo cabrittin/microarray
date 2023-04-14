@@ -60,7 +60,7 @@ def sum_of_nonzero_genes(sc,ax=None,log_scale=True,reverse=False,**kwargs):
 def gene_subset_vs_all_count(sc,gene_list,ax=None,log_scale=True,**kwargs):
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10)) 
     x = query.cell_total_counts(sc)
-    y = query.cell_total_counts(sc,genes=sc.gene_list)
+    y = query.cell_total_counts(sc,genes=gene_list)
     xlabel,ylabel = 'all_gene_count','sub_gene_count'  
     if log_scale:
         x = np.log(x+1)
@@ -93,6 +93,24 @@ def hvg_mean_var(sc,label='qc_hvg',ax=None,**kwargs):
     xlabel= 'gene mean'
     ylabel = 'gene var'
     __plot_labels__(ax,xlabel,ylabel,sc.cfg['plot_params'])
+
+def scree_plot(sc,ax=None,**kwarg):
+    #sc.log_standardize() 
+    #decomp.pca(sc,n_components=50)
+    x = np.arange(sc.pca.n_components_) + 1
+    if ax is None: fig,ax = plt.subplots(1,1,figsize=(5,5)) 
+    ax.plot(x, sc.pca.explained_variance_ratio_, 'o-',markersize=4,c='k')
+    __plot_labels__(ax,'Principle component','Variance explained',sc.cfg['plot_params'])
+
+def cumulative_variance(sc,ax=None,**kwarg):
+    #sc.log_standardize() 
+    #decomp.pca(sc,n_components=50)
+    x = np.arange(sc.pca.n_components_) + 1
+    if ax is None: fig,ax = plt.subplots(1,1,figsize=(5,5)) 
+    ax.plot(x, np.cumsum(sc.pca.explained_variance_ratio_), 'o-',markersize=4,c='k')
+    __plot_labels__(ax,'Principle component','Cumulative variance explained',sc.cfg['plot_params'])
+
+
 
 """ Deprecated below here """
 
@@ -199,14 +217,6 @@ def _cell_elements_vs_counts(sc,callback):
     xlabel = '#_cells_with_gene'
     run_plot(sc,sc.X.shape[0],ylabel=ylabel,xlabel=xlabel,fout=sc.params.fout,x=elements,callback=callback)
     sc.fig_saved = True
-
-def scree_plot(sc,ax=None,**kwarg):
-    #sc.log_standardize() 
-    #decomp.pca(sc,n_components=50)
-    x = np.arange(sc.D.n_components_) + 1
-    if ax is None: fig,ax = plt.subplots(1,1,figsize=(5,5)) 
-    ax.plot(x, sc.D.explained_variance_ratio_, 'o-',markersize=4,c='k')
-    __plot_labels__(ax,'Principle component','Variance explained',sc.plot_params)
 
 def plot_cell_scatter(ax,x,y,label):
     ax.scatter(x,y,s=2)

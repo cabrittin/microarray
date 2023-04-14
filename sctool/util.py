@@ -11,7 +11,6 @@
 from configparser import ConfigParser,ExtendedInterpolation
 import importlib
 
-import sctool.datasets as ds
 
 def checkout(cfile,dname):
     """ 
@@ -47,6 +46,7 @@ def load_sc(cfg,**kwargs):
     --------
     SingleCell class
     """
-    module = importlib.import_module(f"sctool.datasets.{cfg['meta']['alias']}.sc") 
+    #module = importlib.import_module(f"sctool.datasets.{cfg['meta']['alias']}.sc") 
+    module = importlib.import_module(f"sctool.sc")
     return module.SingleCell(cfg,**kwargs)
 

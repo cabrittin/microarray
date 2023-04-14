@@ -12,14 +12,14 @@ import toolbox.matrix_properties as mp
 import numpy as np
 from skmisc.loess import loess
 
-def hvg_seurat3(sc,return_model=False,num_genes=0):
+def hvg_seurat3(X,return_model=False,num_genes=0):
     """
     Identifies highly variable genes using the Seurat3
     methodology. For details, see https://doi.org/10.1101/460147
 
     Parameters:
     -----------
-    sc: Single cell object
+    X: cells by gene array
     
     return_model: bool (optional, default: False)
         If true, return the loess model use to fit the data
@@ -35,9 +35,9 @@ def hvg_seurat3(sc,return_model=False,num_genes=0):
 
     """
     
-    mean,var = mp.axis_mean_var(sc.X,axis=0,skip_zeros=False) 
+    mean,var = mp.axis_mean_var(X,axis=0,skip_zeros=False) 
     not_const = var > 0
-    estimate_var = np.zeros(sc.X.shape[1], dtype=np.float64)
+    estimate_var = np.zeros(X.shape[1], dtype=np.float64)
     x = np.log10(mean[not_const])
     y = np.log10(var[not_const])
     
@@ -48,12 +48,12 @@ def hvg_seurat3(sc,return_model=False,num_genes=0):
     reg_std = np.sqrt(10 ** estimate_var)
     
     ## Clip values
-    N = sc.X.shape[0] 
+    N = X.shape[0] 
     clip_val = reg_std * np.sqrt(N) + mean
-    batch_counts = mp.axis_clip_value(sc.X,clip_val,axis=0)
+    batch_counts = mp.axis_clip_value(X,clip_val,axis=0)
     
     ## Variance of standardized values
-    norm_gene_var = mp.var_of_user_standardized_values(sc.X,reg_std,axis=0) 
+    norm_gene_var = mp.var_of_user_standardized_values(X,reg_std,axis=0) 
     idx = np.argsort(norm_gene_var)[::-1]
 
     if num_genes > 0: idx = idx[:num_genes]
