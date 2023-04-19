@@ -40,7 +40,7 @@ def cossim(x,y):
     return np.dot(x,y) / float(np.sqrt(x.sum()) * np.sqrt(y.sum()))
 
 def hvg_batch_vs_all(sc):
-    hall = sc.genes[['qc_hvg']].to_numpy()
+    hall = sc.genes[['hvg']].to_numpy()
     hall = hall.reshape(len(hall))
     hbatch = sc.genes[sc.meta['batch_hvg']].to_numpy()
     hbatch = hbatch.sum(1)
@@ -48,7 +48,7 @@ def hvg_batch_vs_all(sc):
     return cossim(hall,hbatch)
 
 def hvg_batch_vs_all_matrix(sc):
-    bkeys = sc.meta['batch_hvg'] + ['qc_hvg']
+    bkeys = sc.meta['batch_hvg'] + ['hvg']
     N = len(bkeys) 
     Z = np.zeros((len(bkeys),len(bkeys)))
     for i in range(N):
@@ -61,7 +61,7 @@ def hvg_batch_vs_all_matrix(sc):
 def plot_hvg_batch_vs_all(sc):
     tot_sim = hvg_batch_vs_all(sc)
     Z = hvg_batch_vs_all_matrix(sc)
-    bkeys = sc.meta['batch_hvg'] + ['qc_hvg']
+    bkeys = sc.meta['batch_hvg'] + ['hvg']
     
 
     fig,ax = plt.subplots(1,1,figsize=(10,10))

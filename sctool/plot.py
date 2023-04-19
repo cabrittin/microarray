@@ -14,6 +14,15 @@ import seaborn as sns
 from sctool import query
 from toolbox.stats.basic import ecdf
 
+def build_umap(X,**kwargs): 
+    import umap.umap_ as umap
+    reducer = umap.UMAP(**kwargs)
+    reducer.fit(X)
+    embedding = reducer.transform(X)
+    return embedding,reducer
+    #np.save(params.embedding, embedding)
+    #pickle.dump(reducer, open(params.transform,'wb'))
+
 def gene_by_label(df,gene,label,ax=None,callback=None,show=True,**kwargs):
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,5))
     

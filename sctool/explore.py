@@ -14,14 +14,15 @@ import inspect
 import matplotlib.pyplot as plt
 import scipy.stats
 import seaborn as sns
+import mplcursors
 
 #from toolbox.plots import plot_multi_pages
 import toolbox.matrix_properties as mp
 from toolbox.stats.basic import ecdf
 from toolbox.scale import standardize
-from sctool.feature_selection import hvg_seurat3
+#from sctool.feature_selection import hvg_seurat3
 from sctool import query
-import sctool.decomposition as decomp
+#import sctool.decomposition as decomp
 
 
 def sum_of_gene_counts(sc,ax=None,log_scale=True,reverse=False,**kwargs):
@@ -78,7 +79,7 @@ def residual_filter(sc,x,y,hue,ax=None,**kwargs):
     sns.scatterplot(sc.cells,ax=ax,x=x,y=y,hue=hue,palette=cdict,s=10)
     ax.plot(_x,_y,c='k')
 
-def hvg_mean_var(sc,label='qc_hvg',ax=None,**kwargs):
+def hvg_mean_var(sc,label='hvg',ax=None,**kwargs):
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10))
     eps = 1e-5
     mean,var = mp.axis_mean_var(sc.X,axis=0,skip_zeros=False) 
@@ -95,20 +96,30 @@ def hvg_mean_var(sc,label='qc_hvg',ax=None,**kwargs):
     __plot_labels__(ax,xlabel,ylabel,sc.cfg['plot_params'])
 
 def scree_plot(sc,ax=None,**kwarg):
-    #sc.log_standardize() 
-    #decomp.pca(sc,n_components=50)
     x = np.arange(sc.pca.n_components_) + 1
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(5,5)) 
     ax.plot(x, sc.pca.explained_variance_ratio_, 'o-',markersize=4,c='k')
     __plot_labels__(ax,'Principle component','Variance explained',sc.cfg['plot_params'])
 
 def cumulative_variance(sc,ax=None,**kwarg):
-    #sc.log_standardize() 
-    #decomp.pca(sc,n_components=50)
     x = np.arange(sc.pca.n_components_) + 1
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(5,5)) 
     ax.plot(x, np.cumsum(sc.pca.explained_variance_ratio_), 'o-',markersize=4,c='k')
     __plot_labels__(ax,'Principle component','Cumulative variance explained',sc.cfg['plot_params'])
+
+def hover_gene(sc,idx):
+    return sc.genes[sc.gene.key][idx]
+
+def pca_loadings(sc,ax=None,dim=[0,1],**kwargs):
+    x = np.arange(sc.pca.n_components_) + 1
+    if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10)) 
+    ax.scatter(sc.pca.loadings[:,dim[0]],sc.pca.loadings[:,dim[1]],c='#9f9f9f',s=5)
+    __plot_labels__(ax,f'PC {dim[0]} loading',f'PC {dim[1]} loading',sc.cfg['plot_params'])
+    cursor = mplcursors.cursor(hover=True)
+    cursor.connect(
+        "add", lambda sel: sel.annotation.set_text(
+            f"Gene: {sc.genes[sc.gene_key][sel.target.index]}")
+    )
 
 
 

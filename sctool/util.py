@@ -10,7 +10,7 @@
 
 from configparser import ConfigParser,ExtendedInterpolation
 import importlib
-
+import pickle
 
 def checkout(cfile,dname):
     """ 
@@ -49,4 +49,29 @@ def load_sc(cfg,**kwargs):
     #module = importlib.import_module(f"sctool.datasets.{cfg['meta']['alias']}.sc") 
     module = importlib.import_module(f"sctool.sc")
     return module.SingleCell(cfg,**kwargs)
+
+def to_pickle(sc,fout):
+    """
+    Convenience function for pickling SingleCell instance
+    
+    Args:
+    -----
+    sc: SingleCell object
+    fout: str, Path to output file
+
+    """
+    with open(fout, 'wb') as f: pickle.dump(sc, f)
+
+def from_pickle(fin):
+    """
+    Convenience function loading SingleCell instance from pickle
+    
+    Args:
+    -----
+    fout: str, Path to input pickle file
+
+    """
+    with open(fin, 'rb') as f: 
+        return pickle.load(f)
+
 

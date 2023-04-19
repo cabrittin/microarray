@@ -19,7 +19,7 @@ from scipy.spatial.distance import pdist
 
 import toolbox.matrix_properties as mp
 from sctool import scale
-from sctool.feature_selection import hvg_seurat3
+#from sctool.feature_selection import hvg_seurat3
 
 def matrix_rows(X,idx):
     if sp.issparse(X): 
@@ -111,29 +111,6 @@ def qc_residual_filter(sc,x,y,thresh=-2,label='qc_residual_filter'):
     RF = namedtuple("Residual", "slope intercept r p std_err")
     sc.residual_filter = RF(slope,intercept,r,p,std_err) 
 
-def qc_mean_var_hvg(sc,num_hvg=1000,label='qc_hvg',batch=False,meta_key='batch_hvg'):
-    if batch:
-        sc.meta[meta_key] = []
-        sc.X = sc.X.tocsr()
-        for b in sc.batches:
-            print(f"Batch {b}")
-            idx = sc.cells.index[sc.cells[b] == 1].tolist()
-            hvg,model = _qc_mean_var_hvg(sc.X[idx,:],num_hvg=num_hvg)
-            bkey = b + '_hvg'
-            sc.meta[meta_key].append(bkey)
-            sc.genes[bkey] =  hvg
-        sc.X = sc.X.tocoo()
-    else:
-        hvg,model = _qc_mean_var_hvg(sc.X,num_hvg=num_hvg)
-        sc.genes[label] = hvg
-        sc.hvg_model = model
-
-def _qc_mean_var_hvg(X,num_hvg=1000):
-    idx, model = hvg_seurat3(X,return_model=True) 
-    hvg = np.zeros(X.shape[1],dtype=int)
-    hvg[idx[:num_hvg]] = 1
-    return hvg,model
-
 
 def gene_mean_filter(sc,thresh,label='qc_gene_mean'):
     mu = mp.axis_mean(sc.X,axis=0,skip_zeros=False)
@@ -177,7 +154,7 @@ def label_gene_counts(sc,genes,labels,key=None,std_scale=False):
     df2 = pd.DataFrame(X,columns=genes)
     return pd.concat([df1,df2],axis='columns')
 
-def pca(sc,gene_flag=None,n_components=50,**kwargs):
+def pca(sc,gene_flag=None,n_components=50,set_loadings=False,**kwargs):
     """
     gene_flag: subselect genes based on conditional flag, must alread be set in genes dataframe
     """
@@ -188,6 +165,9 @@ def pca(sc,gene_flag=None,n_components=50,**kwargs):
         sc.pca.components = sc.pca.fit_transform(X[:,jdx])
     else:
         sc.pca.components = sc.pca.fit_transform(X)
+    
+    if set_loadings:
+        sc.pca.loadings = sc.pca.components_.T*np.sqrt(sc.pca.explained_variance_)
 
 def similarity_matrix(sc,metric='jaccard',pca=True,**kwargs):
     if pca:
