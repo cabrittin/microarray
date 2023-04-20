@@ -1,5 +1,5 @@
 """
-@name: sctool.embedding.py                     
+@name: sctool.pp.embedding.py                     
 @description:                  
     Functions for low dimensional embedding
 
@@ -10,13 +10,16 @@
 
 import sklearn.decomposition as skd
 import numpy as np
-
+from scipy.sparse import issparse
 
 def pca(sc,gene_flag=None,n_components=50,set_loadings=False,**kwargs):
     """
     gene_flag: subselect genes based on conditional flag, must alread be set in genes dataframe
     """
-    X = sc.X.toarray() 
+    if issparse(sc.X): 
+        X = sc.X.toarray() 
+    else:
+        X = sc.X.copy()
     sc.pca = skd.PCA(n_components=n_components,**kwargs)
     if gene_flag is not None:
         jdx = sc.genes.index[sc.genes[gene_flag] == 1].tolist()

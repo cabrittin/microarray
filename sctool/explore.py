@@ -25,38 +25,6 @@ from sctool import query
 #import sctool.decomposition as decomp
 
 
-def sum_of_gene_counts(sc,ax=None,log_scale=True,reverse=False,**kwargs):
-    data = mp.axis_sum(sc.X,axis=0) 
-    xlabel = f"{inspect.stack()[0][3]}"
-    
-    if log_scale:
-        data = np.log(data)
-        xlabel = f"log({inspect.stack()[0][3]})"
-    
-    plot_ecdf(data,ax=ax,xlabel=xlabel,
-            reverse=reverse,plot_params=sc.cfg['plot_params'])
-
-def sum_of_cell_counts(sc,genes=None,ax=None,log_scale=True,reverse=False,**kwargs):
-    data = query.cell_total_counts(sc,genes=genes)
-    xlabel = f"{inspect.stack()[0][3]}"
-    
-    if log_scale:
-        data = np.log(data)
-        xlabel = f"log({inspect.stack()[0][3]})"
-    
-    plot_ecdf(data,ax=ax,xlabel=xlabel,
-            reverse=reverse,plot_params=sc.cfg['plot_params'],**kwargs)
-
-def sum_of_nonzero_genes(sc,ax=None,log_scale=True,reverse=False,**kwargs):
-    data = mp.axis_elements(sc.X,axis=1) 
-    xlabel = f"{inspect.stack()[0][3]}"
-    
-    if log_scale:
-        data = np.log(data)
-        xlabel = f"log({inspect.stack()[0][3]})"
-    
-    plot_ecdf(data,ax=ax,xlabel=xlabel,
-            reverse=reverse,plot_params=sc.cfg['plot_params'],**kwargs)
 
 def gene_subset_vs_all_count(sc,gene_list,ax=None,log_scale=True,**kwargs):
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10)) 
@@ -78,22 +46,6 @@ def residual_filter(sc,x,y,hue,ax=None,**kwargs):
     cdict = {0:'r',1:'#9f9f9f'} 
     sns.scatterplot(sc.cells,ax=ax,x=x,y=y,hue=hue,palette=cdict,s=10)
     ax.plot(_x,_y,c='k')
-
-def hvg_mean_var(sc,label='hvg',ax=None,**kwargs):
-    if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10))
-    eps = 1e-5
-    mean,var = mp.axis_mean_var(sc.X,axis=0,skip_zeros=False) 
-    sc.genes['mean'] = np.log10(mean+eps)
-    sc.genes['var'] = np.log10(var+eps)
-    x = np.log10(mean[var>0])
-    _x = np.linspace(x.min(),x.max(),100)
-    _y = sc.hvg_model.predict(_x).values
-    cdict = {1:'r',0:'#9f9f9f'} 
-    sns.scatterplot(sc.genes,x='mean',y='var',hue=label,palette=cdict,ax=ax,s=5)
-    ax.plot(_x,_y,c='k')
-    xlabel= 'gene mean'
-    ylabel = 'gene var'
-    __plot_labels__(ax,xlabel,ylabel,sc.cfg['plot_params'])
 
 def scree_plot(sc,ax=None,**kwarg):
     x = np.arange(sc.pca.n_components_) + 1
@@ -260,7 +212,9 @@ def plot_ecdf(data,ax=None,xlabel=None,reverse=False,plot_params=None):
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10))
     x,y = ecdf(data,reverse=reverse)
     ax.plot(x,y)
+    ax.set_ylim([0,1])
     __plot_labels__(ax,xlabel,ylabel,plot_params)
+    return ax
     
 def __plot_labels__(ax,xlabel,ylabel,params):
     try:

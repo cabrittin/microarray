@@ -18,7 +18,6 @@ import sklearn.decomposition as skd
 from scipy.spatial.distance import pdist
 
 import toolbox.matrix_properties as mp
-from sctool import scale
 #from sctool.feature_selection import hvg_seurat3
 
 def matrix_rows(X,idx):
@@ -70,6 +69,26 @@ def cell_total_counts(sc,genes=None):
 
     return csum
 
+def cell_num_genes(sc,genes=None):
+    """
+    Returns number of genes expressed in cell across provided genes.
+    If genes is None, then counts across all cells are taken
+    
+    Args:
+    -----
+    sc: SingleCell object 
+    genes: str,list
+        Name of genes
+    """
+    if genes is not None:
+        jdx = sc.get_gene_index(genes)
+        X = matrix_cols(sc.X,jdx)
+        csum = mp.axis_elements(X,axis=1)
+    else:
+        csum = mp.axis_elements(sc.X,axis=1)
+
+    return csum
+
 def median_cell_count(sc,genes=None):
     return np.median(cell_total_counts(sc,genes=genes))
 
@@ -85,15 +104,6 @@ def minimum_genes_in_cell(sc,thresh,label='total_cells'):
     qc[x>=thresh] = 1
     sc.cells[label] = qc
 
-def qc_cell_total_count(sc,genes=None,thresh=0,label='qc_total_count'):
-    """
-    Adds columns to cell meta if qc cell total count thresh is met
-    """
-    x = cell_total_counts(sc,genes=genes)
-    x[x<thresh] = 0
-    x[x > 0] = 1
-    x = x.astype(int)
-    sc.cells[label] = x
 
 def qc_residual_filter(sc,x,y,thresh=-2,label='qc_residual_filter'):
     slope, intercept, r, p, std_err = stats.linregress(x, y)

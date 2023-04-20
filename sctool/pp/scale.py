@@ -9,6 +9,7 @@
 """
 
 import toolbox.scale as tsc
+import toolbox.matrix_properties as mp
 import numpy as np
 import scipy.sparse as sp
 
@@ -31,10 +32,22 @@ def round_averaged_counts(sc):
     sc.X.data = np.around(sc.X.data)
     sc.X.eliminate_zeros()
 
-def standardize(X,axis=0):
-    std = X.std(axis=axis)
+def standardize(sc,axis=0):
+    """
+    Note is sc.X is sparse then standardizing with result in dense array
+    """
+    if sp.issparse(sc.X): sc.X = sc.X.toarray()
+    std = sc.X.std(axis=axis)
+    std[std==0] = 1e-5
     if axis == 1: std = std.reshape(-1,1)
-    return np.true_divide(X - X.mean(axis=axis),std)
+    return np.true_divide(sc.X - sc.X.mean(axis=axis),std)
+
+def clip(sc,clip_val):
+    if sp.issparse(sc.X): return mp.axis_clip_value(sc.X,clip_val)
+    
+    X = sc.X.copy()
+    X[X>clip_val] = clip_val
+    return X
 
 def normalize_per_cell(sc,counts_per_cell_after=10000,copy=True):
     return tsc.sum_to_target(sc.X,counts_per_cell_after,axis=1)

@@ -15,29 +15,36 @@ from tqdm import tqdm
 
 import toolbox.matrix_properties as mp
 
-def flag_hvg(sc,method='mean_variance',num_hvg=1000,label='hvg',keep_model=False):
-    hvg,model = globals()[method](sc.X,num_hvg)
-    sc.genes[label] = hvg
-    if keep_model: sc.hvg_model = model
-     
-def flag_hvg_batch(sc,method='mean_variance',num_hvg=1000,label='hvg',meta_key='batch_hvg',keep_model=False):
-    sc.meta[meta_key] = []
-    if keep_model: sc.hvg_batch_model = {} 
-    sc.X = sc.X.tocsr()
-    for b in tqdm(sc.batches,desc='Batches processed:'):
-        idx = sc.cells.index[sc.cells[b] == 1].tolist()
-        hvg,model = globals()[method](sc.X[idx,:],num_hvg)
-        bkey = b + '_hvg'
-        sc.meta[meta_key].append(bkey)
-        sc.genes[bkey] =  hvg
-        if keep_model: sc.hvg_batch_model['b'] = model
-    sc.X = sc.X.tocoo()
-
-def merge_hvg_batch(sc,label='merge_hvg'):
+def merge_batch(sc,label='merge_hvg'):
     hvg = sc.genes[sc.meta['batch_hvg']].to_numpy()
     hvg = hvg.sum(1)
     hvg[hvg > 0] = 1
     sc.genes[label] = hvg
+
+def batch_vs_all_matrix(sc):
+    bkeys = sc.meta['batch_hvg'] + ['hvg']
+    N = len(bkeys) 
+    Z = np.zeros((len(bkeys),len(bkeys)))
+    for i in range(N):
+        x = sc.genes[[bkeys[i]]].to_numpy() 
+        for j in range(i,N):
+            y = sc.genes[[bkeys[j]]].to_numpy()
+            Z[i,j] = cossim(x,y)
+    return Z
+
+def cossim(x,y):
+    x = x.reshape(len(x))
+    y = y.reshape(len(y))
+    return np.dot(x,y) / float(np.sqrt(x.sum()) * np.sqrt(y.sum()))
+
+def merge_batch_vs_all(sc):
+    hall = sc.genes[['hvg']].to_numpy()
+    hall = hall.reshape(len(hall))
+    hbatch = sc.genes[sc.meta['batch_hvg']].to_numpy()
+    hbatch = hbatch.sum(1)
+    hbatch[hbatch > 0] = 1
+    return cossim(hall,hbatch)
+
 
 def run_hvg(func):
     def inner(X,num_hvg,**kwargs):
