@@ -96,5 +96,27 @@ def mean_variance(X,**kwargs):
     return idx, model
 
 
+@run_hvg
+def poisson_dispersion(X,**kwargs):
+    from scipy import stats
+    eps = 1e5 
+    mean,var = mp.axis_mean_var(X,axis=0,skip_zeros=False) 
+    cv2 = np.divide(var,np.power(mean,2))
+    cv2 = np.log2(cv2) 
+    mean = np.log2(mean)
+
+    slope, intercept, r, p, std_err = stats.linregress(mean, cv2)
+    resid = cv2 - (slope* mean + intercept)
+    rstd = np.std(resid)
+    rnorm = np.divide(resid - np.mean(resid), np.std(resid))
+    #resid[rnorm < thresh] = 0
+    #resid[rnorm >= thresh] = 1
+    #yes = np.where(resid == 1)[0]
+    #no = np.where(resid==0)[0]
+    #_x = np.linspace(x.min(),x.max(),100)
+    #_y = slope * _x + intercept + thresh*rstd
+    idx = np.argsort(rnorm)[::-1]
+    model = None
+    return idx, model
 
 

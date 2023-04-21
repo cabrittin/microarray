@@ -47,12 +47,6 @@ def residual_filter(sc,x,y,hue,ax=None,**kwargs):
     sns.scatterplot(sc.cells,ax=ax,x=x,y=y,hue=hue,palette=cdict,s=10)
     ax.plot(_x,_y,c='k')
 
-def scree_plot(sc,ax=None,**kwarg):
-    x = np.arange(sc.pca.n_components_) + 1
-    if ax is None: fig,ax = plt.subplots(1,1,figsize=(5,5)) 
-    ax.plot(x, sc.pca.explained_variance_ratio_, 'o-',markersize=4,c='k')
-    __plot_labels__(ax,'Principle component','Variance explained',sc.cfg['plot_params'])
-
 def cumulative_variance(sc,ax=None,**kwarg):
     x = np.arange(sc.pca.n_components_) + 1
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(5,5)) 

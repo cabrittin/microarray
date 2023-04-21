@@ -14,7 +14,7 @@ import mplcursors
 
 import toolbox.matrix_properties as mp
 from toolbox.stats.basic import ecdf
-from sctool.pp import hvg
+from sctool.pp import hvg,clustering
 
 def pp_ecdf(func):
     def inner(sc,ax=None,log_scale=True,reverse=False,**kwargs):
@@ -69,6 +69,7 @@ def hvg_mean_var(sc,label='hvg',ax=None,**kwargs):
     ylabel = 'gene var'
     __plot_labels__(ax,xlabel,ylabel,sc.cfg['plot_params'])
 
+
 def hvg_batch_vs_all(sc,ax=None):
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10))
     tot_sim = hvg.merge_batch_vs_all(sc)
@@ -76,6 +77,38 @@ def hvg_batch_vs_all(sc,ax=None):
     bkeys = sc.meta['batch_hvg'] + ['hvg']
     sns.heatmap(Z,xticklabels=bkeys,yticklabels=bkeys)
     ax.set_title('Merged similarity: %1.2f' %tot_sim)
+
+
+def hvg_poisson_2(sc,label='hvg',ax=None,**kwargs):
+    from scipy import stats
+    if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10))
+    eps = 1e-5
+    mean,var = mp.axis_mean_var(sc.X,axis=0,skip_zeros=False) 
+    cv2 = np.divide(var,np.power(mean,2))
+    cv2 = np.log2(cv2+eps) 
+    mean = np.log2(mean+eps)
+    
+    thresh = 2
+    slope, intercept, r, p, std_err = stats.linregress(mean, cv2)
+    resid = cv2 - (slope* mean + intercept)
+    rstd = np.std(resid)
+    rnorm = np.divide(resid - np.mean(resid), np.std(resid))
+    resid[rnorm < thresh] = 0
+    resid[rnorm >= thresh] = 1
+    yes = np.where(resid == 1)[0]
+    no = np.where(resid==0)[0]
+    _x = np.linspace(mean.min(),mean.max(),100)
+    _y = slope * _x + intercept# + thresh*rstd
+
+    #fig,ax = plt.subplots(1,1,figsize=(10,10))
+    #ax.scatter(mean,cv2,s=5,c='#9f9f9f') 
+    ax.scatter(mean[yes],cv2[yes],s=5,color='r')
+    ax.scatter(mean[no],cv2[no],s=5,color='#9f9f9f')
+    ax.plot(_x,_y,'k') 
+    ax.set_xlabel('log2(mean)',fontsize=10)
+    ax.set_ylabel('log2(CV2)',fontsize=10)
+    #plt.show()
+    
 
 def scree_plot(sc,ax=None,**kwarg):
     x = np.arange(sc.pca.n_components_) + 1
@@ -94,6 +127,11 @@ def pca_loadings(sc,ax=None,dim=[0,1],**kwargs):
             f"Gene: {sc.genes[sc.gene_key][sel.target.index]}")
     )
 
+def multi_res_clusters(sc,ax=None):
+    if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10))
+    Z = clustering.multi_res_compare(sc)
+    bkeys = sc.meta['cluster_res']
+    sns.heatmap(Z,xticklabels=bkeys,yticklabels=bkeys)
 
 
 def plot_ecdf(data,ax=None,xlabel=None,reverse=False,plot_params=None):

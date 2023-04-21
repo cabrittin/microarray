@@ -19,7 +19,6 @@ import pandas as pd
 from tqdm import tqdm
 import mplcursors
 
-import phenograph
 
 from pycsvparser import read
 from sctool import util,query,explore,scmod,plot
@@ -146,6 +145,21 @@ def run_hvg(sc):
     plt.savefig("data/packer2019/plots/qc_hvg_merge_vs_all.png")
     plt.show() 
 
+def run_hvg_poisson_2(sc):
+    """ 
+    count_filter(sc,verbose=True)
+    pct_mitochondria_filter(sc,verbose=True)
+    num_genes_in_cell_filter(sc,verbose=True)
+    split_into_batch(sc) 
+    normalize_to_median(sc)
+    """ 
+    #pp.flag.hvg_batch(sc,method='poisson_dispersion',num_hvg=1000,keep_model=False)
+    pp.flag.hvg(sc,method='poisson_dispersion',num_hvg=1000,keep_model=False)
+    pp.plot.hvg_poisson_2(sc)
+    plt.savefig("data/packer2019/plots/qc_hvg_poisson2.png")
+    plt.show()
+
+
 def pca_embedding(sc):
     count_filter(sc,verbose=True)
     pct_mitochondria_filter(sc,verbose=True)
@@ -231,9 +245,7 @@ def plot_umap_builds(sc):
  
 def multi_res_clustering(sc):
     k_vals = [5,15,25,35,45]
-    for k in tqdm(k_vals,desc='k:'):
-        communities, graph, Q = phenograph.cluster(sc.pca.components,k=k)
-        sc.cells[f'pheno_k_{k}'] = pd.Categorical(communities)
+    pp.clustering.phenograph(sc,k_vals,label='pheno_k')
     try:
         util.to_pickle(sc,sc.loaded_from)
         print(f"Pickle dump to {sc.loaded_from}")
@@ -257,9 +269,15 @@ def plot_multi_res_clusters(sc):
     
     fout = 'data/packer2019/plots/multi_pheno_clusters.png'
     plt.savefig(fout,dpi=300)
+    
+    pp.plot.multi_res_clusters(sc)
+    fout = 'data/packer2019/plots/multi_pheno_clusters_ari.png'
+    plt.savefig(fout)
+    
     plt.show()
 
 def plot_clusters(sc):
+    print(sc.X.shape)
     k,d,cls = 15,25,25
     umap = f'data/packer2019/umap/embedding_{k}_{d}.npy'
     cls = f'pheno_k_{cls}'
