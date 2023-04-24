@@ -43,6 +43,12 @@ def meta_genes_lte(sc,meta_key,thresh,label='pp_gene_meta'):
     sc.genes[label] = pp
     return label
 
+def _hvg(sc,method='mean_variance',num_hvg=1000,label='hvg',keep_model=False):
+    model = getattr(hvg_,method)(sc.X)
+    model.fit()
+    sc.genes[label] = model.get_flag(num_hvg)
+    if keep_model: sc.hvg_model = model
+ 
 def hvg(sc,method='mean_variance',num_hvg=1000,label='hvg',keep_model=False):
     _hvg,model = getattr(hvg_,method)(sc.X,num_hvg)
     sc.genes[label] = _hvg

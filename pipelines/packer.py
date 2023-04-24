@@ -132,20 +132,24 @@ def run_pp_1(sc):
     plt.show()
 
 def run_hvg(sc):
+    """ 
     count_filter(sc,verbose=True)
     pct_mitochondria_filter(sc,verbose=True)
     num_genes_in_cell_filter(sc,verbose=True)
     split_into_batch(sc) 
     normalize_to_median(sc)
+    """ 
     hvg_batch(sc,keep_model=True)
     hvg_all(sc,keep_model=True)
     pp.plot.hvg_mean_var(sc,label='merge_hvg') 
+    """ 
     plt.savefig("data/packer2019/plots/qc_hvg.png")
     pp.plot.hvg_batch_vs_all(sc)
     plt.savefig("data/packer2019/plots/qc_hvg_merge_vs_all.png")
+    """ 
     plt.show() 
 
-def run_hvg_poisson_2(sc):
+def run_hvg_poisson_dispersion(sc):
     """ 
     count_filter(sc,verbose=True)
     pct_mitochondria_filter(sc,verbose=True)
@@ -153,9 +157,9 @@ def run_hvg_poisson_2(sc):
     split_into_batch(sc) 
     normalize_to_median(sc)
     """ 
-    #pp.flag.hvg_batch(sc,method='poisson_dispersion',num_hvg=1000,keep_model=False)
-    pp.flag.hvg(sc,method='poisson_dispersion',num_hvg=1000,keep_model=False)
-    pp.plot.hvg_poisson_2(sc)
+    #pp.flag.hvg_batch(sc,method='poisson_dispersion',num_hvg=1000,keep_model=True)
+    pp.flag.hvg(sc,method='poisson_dispersion',num_hvg=1000,keep_model=True)
+    pp.plot.hvg_poisson_dispersion(sc)#,label='merge_hvg')
     plt.savefig("data/packer2019/plots/qc_hvg_poisson2.png")
     plt.show()
 

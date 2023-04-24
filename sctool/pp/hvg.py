@@ -12,8 +12,10 @@ import toolbox.matrix_properties as mp
 import numpy as np
 from skmisc.loess import loess
 from tqdm import tqdm
+from collections import namedtuple
 
 import toolbox.matrix_properties as mp
+
 
 def merge_batch(sc,label='merge_hvg'):
     hvg = sc.genes[sc.meta['batch_hvg']].to_numpy()
@@ -99,24 +101,24 @@ def mean_variance(X,**kwargs):
 @run_hvg
 def poisson_dispersion(X,**kwargs):
     from scipy import stats
-    eps = 1e5 
+    eps = 1e-5
     mean,var = mp.axis_mean_var(X,axis=0,skip_zeros=False) 
-    cv2 = np.divide(var,np.power(mean,2))
-    cv2 = np.log2(cv2) 
-    mean = np.log2(mean)
-
+    cv2 = np.divide(var,np.power(mean+eps,2))
+    cv2 = np.log2(cv2+eps) 
+    mean = np.log2(mean+eps)
     slope, intercept, r, p, std_err = stats.linregress(mean, cv2)
     resid = cv2 - (slope* mean + intercept)
     rstd = np.std(resid)
     rnorm = np.divide(resid - np.mean(resid), np.std(resid))
-    #resid[rnorm < thresh] = 0
-    #resid[rnorm >= thresh] = 1
-    #yes = np.where(resid == 1)[0]
-    #no = np.where(resid==0)[0]
-    #_x = np.linspace(x.min(),x.max(),100)
-    #_y = slope * _x + intercept + thresh*rstd
+
+    """ This is a hack to maintain consistency with the loess class""" 
+    M = namedtuple('Model','predict')
+    def predict(newdata):
+        P = namedtuple("P","values") 
+        return P(slope * newdata + intercept)
+
+    model = M(predict)
     idx = np.argsort(rnorm)[::-1]
-    model = None
     return idx, model
 
 
