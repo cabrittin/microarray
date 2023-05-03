@@ -17,15 +17,16 @@ from toolbox.stats.basic import ecdf
 from sctool.pp import hvg,clustering
 
 def pp_ecdf(func):
-    def inner(sc,ax=None,log_scale=True,reverse=False,**kwargs):
+    def inner(sc,ax=None,reverse=False,log_scale=True,**kwargs):
         xlabel, data = func(sc,**kwargs)
-        
+
         if log_scale:
             data = np.log2(data+1)
             xlabel = f"log2({xlabel})"
-     
+        
         ax = plot_ecdf(data,ax=ax,xlabel=xlabel,
-                reverse=reverse,plot_params=sc.cfg['plot_params'])
+                reverse=reverse,plot_params=sc.cfg['plot_params'],**kwargs)
+
         return ax
     return inner
 
@@ -57,8 +58,10 @@ def meta_cell_value(sc,label=None,**kwargs):
 def pp_hvg(func):
     def inner(sc,label='hvg',ax=None,**kwargs):
         if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10))
-        xlabel,ylabel,x = func(sc,**kwargs) 
-        _x = np.linspace(x.min(),x.max(),100)
+        xlabel,ylabel,x,y = func(sc.X,**kwargs) 
+        sc.genes[xlabel] = x
+        sc.genes[ylabel] = y
+        _x = np.linspace(sc.hvg_model.inputs.x.min(),sc.hvg_model.inputs.x.max(),100)
         _y = sc.hvg_model.predict(_x).values
         cdict = {1:'r',0:'#9f9f9f'} 
         sns.scatterplot(sc.genes,x=xlabel,y=ylabel,hue=label,palette=cdict,ax=ax,s=5)
@@ -68,26 +71,26 @@ def pp_hvg(func):
     return inner
 
 @pp_hvg
-def hvg_mean_var(sc,**kwargs):
-    xlabel,ylabel = 'mean','var'
+def hvg_mean_var(X,**kwargs):
+    xlabel,ylabel = 'log10(mean)','log10(var)'
     eps = 1e-5 
-    mean,var = mp.axis_mean_var(sc.X,axis=0,skip_zeros=False) 
-    sc.genes[xlabel] = np.log10(mean+eps)
-    sc.genes[ylabel] = np.log10(var+eps)
-    x = np.log10(mean[var>0])
-    return xlabel,ylabel,x
+    mean,var = mp.axis_mean_var(X,axis=0,skip_zeros=False) 
+    return xlabel,ylabel,np.log10(mean+eps),np.log10(var+eps)
 
 @pp_hvg
-def hvg_poisson_dispersion(sc,**kwargs):
+def hvg_poisson_dispersion(X,**kwargs):
+    from sctool.pp.hvg import _poisson_dispersion 
     xlabel,ylabel = 'log2(mean)','log2(cv2)'
-    eps = 1e-5
-    mean,var = mp.axis_mean_var(sc.X,axis=0,skip_zeros=False) 
-    cv2 = np.divide(var,np.power(mean,2))
-    cv2 = np.log2(cv2+eps) 
-    mean = np.log2(mean+eps)
-    sc.genes[xlabel] = mean
-    sc.genes[ylabel] = cv2
-    return xlabel,ylabel,mean
+    x,y = _poisson_dispersion(X)
+    return xlabel,ylabel,x,y
+
+@pp_hvg
+def hvg_poisson_zero_count(X,**kwargs):
+    from sctool.pp.hvg import _poisson_zero_count 
+    xlabel,ylabel = 'log2(mean)','# zero UMI'
+    x,y = _poisson_zero_count(X) 
+    return xlabel,ylabel,x,y
+
 
 
 def hvg_batch_vs_all(sc,ax=None):
@@ -123,13 +126,15 @@ def multi_res_clusters(sc,ax=None):
     sns.heatmap(Z,xticklabels=bkeys,yticklabels=bkeys)
 
 
-def plot_ecdf(data,ax=None,xlabel=None,reverse=False,plot_params=None):
+def plot_ecdf(data,ax=None,xlabel=None,reverse=False,plot_params=None,callback=None,**kwargs):
     ylabel = ['ECDF','1-ECDF'][int(reverse)]
     if ax is None: fig,ax = plt.subplots(1,1,figsize=(10,10))
     x,y = ecdf(data,reverse=reverse)
-    ax.plot(x,y)
+    ax.plot(x,y,**kwargs)
     ax.set_ylim([0,1])
     __plot_labels__(ax,xlabel,ylabel,plot_params)
+    if callback is not None: callback(ax,x,y,**kwargs)
+
     return ax
     
 def __plot_labels__(ax,xlabel,ylabel,params):

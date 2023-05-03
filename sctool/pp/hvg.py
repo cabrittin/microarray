@@ -86,6 +86,7 @@ def mean_variance(X,**kwargs):
     estimate_var[not_const] = model.outputs.fitted_values
     reg_std = np.sqrt(10 ** estimate_var)
     
+
     ## Clip values
     N = X.shape[0] 
     clip_val = reg_std * np.sqrt(N) + mean
@@ -101,24 +102,81 @@ def mean_variance(X,**kwargs):
 @run_hvg
 def poisson_dispersion(X,**kwargs):
     from scipy import stats
+    x,y = _poisson_dispersion(X)
+    slope, intercept, r, p, std_err = stats.linregress(x, y)
+    resid = y - (slope* x + intercept)
+    rstd = np.std(resid)
+    rnorm = np.divide(resid - np.mean(resid), np.std(resid))
+
+    """ This is a hack to maintain consistency with the loess class""" 
+    M = namedtuple('Model','predict inputs')
+    I = namedtuple('inputs','x') 
+    def predict(newdata):
+        P = namedtuple("P","values") 
+        return P(slope * newdata + intercept)
+    
+    model = M(predict,I(x))
+    idx = np.argsort(rnorm)[::-1]
+    return idx, model
+
+def _poisson_dispersion(X):
     eps = 1e-5
     mean,var = mp.axis_mean_var(X,axis=0,skip_zeros=False) 
     cv2 = np.divide(var,np.power(mean+eps,2))
     cv2 = np.log2(cv2+eps) 
     mean = np.log2(mean+eps)
-    slope, intercept, r, p, std_err = stats.linregress(mean, cv2)
-    resid = cv2 - (slope* mean + intercept)
-    rstd = np.std(resid)
-    rnorm = np.divide(resid - np.mean(resid), np.std(resid))
+    return mean,cv2
+ 
 
+@run_hvg
+def poisson_zero_count(X,**kwargs):
+    x,y = _poisson_zero_count(X)
+    #xx = np.zeros((len(x),2))
+    #xx[:,0] = x
+    #xx[:,1] = y
+    
+    """
+    import matplotlib.pyplot as plt
+    from sklearn.neighbors import NearestNeighbors
+
+    nbrs = NearestNeighbors(n_neighbors = 3)
+    nbrs.fit(xx)
+    distances,index = nbrs.kneighbors(xx)
+    fig,ax = plt.subplots(1,1,figsize=(10,10))
+    ax.hist(distances.mean(axis=1),bins=100)
+    """
+    
     """ This is a hack to maintain consistency with the loess class""" 
-    M = namedtuple('Model','predict')
+    M = namedtuple('Model','predict inputs')
+    I = namedtuple('inputs','x') 
     def predict(newdata):
         P = namedtuple("P","values") 
-        return P(slope * newdata + intercept)
+        mu = 2**newdata
+        n = X.shape[0]
+        _y = n*np.exp(-mu) + (mu / np.sqrt(n))
+        return P(_y)
+    
+    model = M(predict,I(x))
 
-    model = M(predict)
-    idx = np.argsort(rnorm)[::-1]
+    ## Fit loess
+    model1 = loess(x, y, span=0.3, degree=2)
+    model1.fit()
+    estimate_nz = model1.outputs.fitted_values
+    reg_std = np.sqrt(10 ** estimate_nz)
+    
+    ## Variance of standardized values
+    mean = mp.axis_mean(X,axis=0) 
+    norm_nz = np.exp(-mean+reg_std)
+
+    idx = np.argsort(norm_nz)[::-1]
+    
     return idx, model
 
+def _poisson_zero_count(X):
+    eps = 1e-5 
+    mean = mp.axis_mean(X,axis=0,skip_zeros=False)
+    mean = np.log2(mean + eps) 
+    num_z = X.shape[0] - mp.axis_elements(X,axis=0)
+    
+    return mean,num_z
 

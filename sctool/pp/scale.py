@@ -49,7 +49,7 @@ def clip(sc,clip_val):
     X[X>clip_val] = clip_val
     return X
 
-def normalize_per_cell(sc,counts_per_cell_after=10000,copy=True):
+def normalize_per_cell(sc,counts_per_cell_after=1000000,copy=True):
     return tsc.sum_to_target(sc.X,counts_per_cell_after,axis=1)
 
 def log1p(sc):
