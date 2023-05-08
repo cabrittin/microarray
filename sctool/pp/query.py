@@ -49,48 +49,69 @@ def gene_counts(sc,genes,key=None):
     X = matrix_cols(sc.X,jdx)
     return X
 
-def cell_total_counts(sc,genes=None):
-    """
-    Returns total counts for cell across provided genes.
-    If genes is None, then counts across all cells are taken
+def cell_query(func):
+    def inner(sc,genes=None,**kwargs):
+        """
+        Decorator function for making queries on the count matrix rows (cells)
+
+        Function provides a convenient wrapper to allow users to specify a subset of genes.
+
+        Args:
+        -----
+        sc: SingleCell object 
+        genes: str,list
+            Name of genes
+        """
+        if genes is not None:
+            jdx = sc.get_gene_index(genes)
+            X = matrix_cols(sc.X,jdx)
+            csum = func(X,**kwargs)
+        else:
+            csum = func(sc.X,**kwargs)
+
+        return csum
     
-    Args:
-    -----
-    sc: SingleCell object 
-    genes: str,list
-        Name of genes
+    return inner
+
+
+@cell_query
+def cell_total_counts(X,**kwargs):
     """
-    if genes is not None:
-        jdx = sc.get_gene_index(genes)
-        X = matrix_cols(sc.X,jdx)
-        csum = mp.axis_sum(X,axis=1)
-    else:
-        csum = mp.axis_sum(sc.X,axis=1)
+    Returns total counts for cells.
+    """ 
+    return mp.axis_sum(X,axis=1)
 
-    return csum
-
-def cell_num_genes(sc,genes=None):
+@cell_query
+def cell_num_genes(X,**kwargs):
     """
     Returns number of genes expressed in cell across provided genes.
     If genes is None, then counts across all cells are taken
-    
-    Args:
-    -----
-    sc: SingleCell object 
-    genes: str,list
-        Name of genes
+    """ 
+    return mp.axis_elements(X,axis=1)
+
+@cell_query
+def size_factor(X,**kwargs):
     """
-    if genes is not None:
-        jdx = sc.get_gene_index(genes)
-        X = matrix_cols(sc.X,jdx)
-        csum = mp.axis_elements(X,axis=1)
-    else:
-        csum = mp.axis_elements(sc.X,axis=1)
+    Computes the size factor used in the Monocle package
+    
+    Size factor is defined as the cell’s total UMI count divided by the 
+    geometric mean of all cells’ total UMI counts
 
-    return csum
+    """
+    csum = mp.axis_sum(X,axis=1)
+    return csum / np.exp(np.mean(np.log(csum)))
 
-def median_cell_count(sc,genes=None):
+
+@cell_query
+def median_cell_count(sc,**kwargs):
+    """
+    Computes the median cell count
+    """
     return np.median(cell_total_counts(sc,genes=genes))
+
+def mean_gean_count(sc):
+    
+
 
 def minimum_cells_with_gene(sc,thresh,label='total_cells'):
     x = mp.axis_elements(sc.X,axis=0)

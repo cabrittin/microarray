@@ -16,6 +16,18 @@ import scipy.sparse as sp
 def to_target(sc,target):
     sc.X = tsc.sum_to_target(sc.X,target,axis=1)
 
+def cells_by_vector(sc,x=None,label=None):
+    # Check if coo, if coo make sure to conver back to coo
+    to_coo = (sc.X.getformat() == 'coo')
+
+    if x is None:
+        x = sc.cells[label].to_numpy()
+    r,c = sc.X.nonzero()
+    rD_sp = sp.csr_matrix(((1.0/x)[r], (r,c)), shape=(sc.X.shape))
+    sc.X = sc.X.multiply(rD_sp)
+    if to_coo: sc.X = sc.X.tocoo()
+
+
 def seurat_log_scale(sc,scale=10000):
     """
     Performs the 'LogNormalization' in Seurat.
@@ -27,6 +39,11 @@ def seurat_log_scale(sc,scale=10000):
     sc.X = tsc.sum_to_target(sc.X,scale,axis=1)
     #sc.log_scale = True
     sc.X.data = np.log(sc.X.data + 1)
+
+def log_normalization(sc,scale=1000):
+    sc.X = tsc.sum_to_target(sc.X,scale,axis=1)
+    sc.X.data = np.log(sc.X.data + 1)
+
 
 def round_averaged_counts(sc):
     sc.X.data = np.around(sc.X.data)

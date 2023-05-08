@@ -69,6 +69,7 @@ def pct_mitochondria(sc):
     sc.load_gene_list('mitochondria')
     tot_count = query.cell_total_counts(sc)
     mt_count = query.cell_total_counts(sc,genes=sc.gene_list)
+    sc.cells['total_mt_per_cell'] = mt_count
     sc.cells['pct_mt_per_cell'] = np.divide(mt_count,tot_count)
     
 def pct_mitochondria_filter(sc,verbose=False):
@@ -130,6 +131,19 @@ def ecdf_inset_genes(ax,_x,_y,**kwargs):
     axins.set_xlim([0,600])
     axins.set_xticks([0,200,400,600])
 
+def scatter_inset_doublet(ax,df,**kwargs):
+    axins = ax.inset_axes([0.45, 0.1, 0.47, 0.47])
+    df2 = df[(df['total_umi']<20000) & (df['num_genes_in_cell']<4000)] 
+    sns.scatterplot(data=df2,ax=axins,x='total_umi',y='num_genes_in_cell',s=5,color='r')
+    axins.set_xlabel("")
+    axins.set_ylabel("")
+    #axins.set_ylim([0,0.5])
+    #axins.set_ylim(bottom=0)
+    #axins.set_xlim(bottom=0)
+    #axins.set_xlim([0,600])
+    #axins.set_xticks([0,200,400,600])
+
+
 def batch_empty_droplet_total_umi(sc):
     split_into_batch(sc)
     xlabel = 'total_umi'
@@ -159,11 +173,25 @@ def batch_cell_quality_pct_mt(sc):
 
     plt.show()
 
+def batch_cell_quality_total_mt(sc):
+    split_into_batch(sc)
+    pct_mitochondria(sc)
+    sc.cells['total_umi'] = mp.axis_sum(sc.X,axis=1) 
+    xlabel = 'total_mt_per_cell'
+    batch_ecdf(sc,xlabel,None,[0,1000],[0,250,500,750,1000])
+    plt.savefig("data/packer2019/plots/qc/cell_quality_total_mt.png",dpi=300)
+    batch_scatter(sc,'total_umi','total_mt_per_cell')
+    plt.savefig("data/packer2019/plots/qc/cell_quality_umi_vs_total_mt.png",dpi=300)
+
+    plt.show()
+
+
 def batch_doublet_umi_vs_gene(sc):
     split_into_batch(sc)
     sc.cells['total_umi'] = mp.axis_sum(sc.X,axis=1) 
     sc.cells['num_genes_in_cell'] = mp.axis_elements(sc.X,axis=1) 
-    batch_scatter(sc,'total_umi','num_genes_in_cell')
+    batch_scatter(sc,'total_umi','num_genes_in_cell',callback=scatter_inset_doublet)
+    #batch_regression(sc,'total_umi','num_genes_in_cell')
     plt.savefig("data/packer2019/plots/qc/doublet_umi_vs_gene.png",dpi=300)
     plt.show()
 
@@ -190,10 +218,10 @@ def batch_doublet(sc):
     n = len(jdx)
     print(n,float(n) / len(sc.cells))
     
-    #batch_scatter(sc,'muscle_marker','neuron_marker')
+    batch_scatter(sc,'muscle_marker','neuron_marker')
     #sns.histplot(data=sc.cells,x='muscle_marker',y='neuron_marker',bins=30,
     #        cbar=True, cbar_kws=dict(shrink=.75))
-    #plt.savefig("data/packer2019/plots/qc/doublet_muscle_neuron_marker.png",dpi=300)
+    plt.savefig("data/packer2019/plots/qc/doublet_muscle_neuron_marker_scatter.png",dpi=300)
     plt.show()
 
 
@@ -212,12 +240,14 @@ def batch_doublet_neuron_muscle(sc):
 def batch_ecdf(sc,xlabel,callback,xlim,xticks):
     fig,_ax = plt.subplots(2,4,figsize=(20,10))
     ax = _ax.flatten() 
+    print(np.quantile(sc.cells[xlabel].to_numpy(),0.95))
     for (idx,b) in enumerate(sorted(sc.batches)): 
         print(b)
         pp.plot.plot_ecdf(sc.cells[xlabel].to_numpy(),ax=ax[idx],xlabel=xlabel,
                 plot_params=sc.cfg['plot_params'], linestyle='--',linewidth=2,color='#9f9f9f')
         jdx = sc.cells.index[sc.cells[b] == 1].tolist()
         y = sc.cells[xlabel].to_numpy()[jdx]
+        print(np.quantile(y,0.95))
         pp.plot.plot_ecdf(y,ax=ax[idx],xlabel=xlabel,
                 plot_params=sc.cfg['plot_params'],linewidth=2,color='r',callback=callback)
         ax[idx].set_xlim(xlim)
@@ -232,12 +262,18 @@ def batch_scatter(sc,xlabel,ylabel,callback=None):
     for (idx,b) in enumerate(sorted(sc.batches)): 
         print(b)
         df = sc.cells[sc.cells['batch']==b] 
-        #sns.scatterplot(data=sc.cells,ax=ax[idx],x=xlabel,y=ylabel,s=5,color='#9f9f9f')
-        #sns.scatterplot(data=df,ax=ax[idx],x=xlabel,y=ylabel,s=5,color='r')
-        sns.kdeplot(data=sc.cells,ax=ax[idx], x=xlabel, y=ylabel,color="#9f9f9f")
-        sns.kdeplot(data=df,ax=ax[idx], x=xlabel, y=ylabel,color="r")
+        """
+        jdx = df.loc[(df['muscle_marker'] > 1) & (df['neuron_marker']>1)]
+        n = len(jdx)
+        print(n,float(n) / len(sc.cells))
+        """
+        sns.scatterplot(data=sc.cells,ax=ax[idx],x=xlabel,y=ylabel,s=5,color='#9f9f9f')
+        sns.scatterplot(data=df,ax=ax[idx],x=xlabel,y=ylabel,s=5,color='r')
         _title = f"{b} (n = {len(df)})" 
         ax[idx].set_title(_title,fontsize=12)
+        
+        if callback is not None: callback(ax[idx],df) 
+
         """ 
         ax[idx].axvline(x=2,color='k',linestyle='--')
         ax[idx].axhline(y=2,color='k',linestyle='--')
@@ -246,7 +282,25 @@ def batch_scatter(sc,xlabel,ylabel,callback=None):
         """
     plt.tight_layout()
 
+def batch_regression(sc,xlabel,ylabel):
+    x = sc.cells[xlabel]
+    y = sc.cells[ylabel]
+    regress(x,y)
 
+    for (idx,b) in enumerate(sorted(sc.batches)): 
+        print(f"\n{b}")
+        df = sc.cells[sc.cells['batch']==b] 
+        x = df[xlabel]
+        y = df[ylabel]
+        regress(x,y)
+
+
+def regress(x,y):
+    import statsmodels.api as sm 
+    x = sm.add_constant(x)
+    model = sm.OLS(y, x).fit()
+    print_model = model.summary()
+    print(print_model)
 
 
 def run_batch_time_composition(sc):
