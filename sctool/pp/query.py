@@ -49,8 +49,8 @@ def gene_counts(sc,genes,key=None):
     X = matrix_cols(sc.X,jdx)
     return X
 
-def cell_query(func):
-    def inner(sc,genes=None,**kwargs):
+def run_query(func):
+    def inner(sc,genes=None,cells=None,**kwargs):
         """
         Decorator function for making queries on the count matrix rows (cells)
 
@@ -62,26 +62,28 @@ def cell_query(func):
         genes: str,list
             Name of genes
         """
+        X = sc.X.copy()
+
         if genes is not None:
             jdx = sc.get_gene_index(genes)
-            X = matrix_cols(sc.X,jdx)
-            csum = func(X,**kwargs)
-        else:
-            csum = func(sc.X,**kwargs)
+            X = matrix_cols(X,jdx)
+        
+        if cells is not None:
+            X = matrix_rows(X,cells)
 
-        return csum
+        return func(X,**kwargs)
     
     return inner
 
 
-@cell_query
+@run_query
 def cell_total_counts(X,**kwargs):
     """
     Returns total counts for cells.
     """ 
     return mp.axis_sum(X,axis=1)
 
-@cell_query
+@run_query
 def cell_num_genes(X,**kwargs):
     """
     Returns number of genes expressed in cell across provided genes.
@@ -89,7 +91,7 @@ def cell_num_genes(X,**kwargs):
     """ 
     return mp.axis_elements(X,axis=1)
 
-@cell_query
+@run_query
 def size_factor(X,**kwargs):
     """
     Computes the size factor used in the Monocle package
@@ -101,16 +103,19 @@ def size_factor(X,**kwargs):
     csum = mp.axis_sum(X,axis=1)
     return csum / np.exp(np.mean(np.log(csum)))
 
-
-@cell_query
-def median_cell_count(sc,**kwargs):
+@run_query
+def median_cell_count(X,**kwargs):
     """
     Computes the median cell count
     """
-    return np.median(cell_total_counts(sc,genes=genes))
+    return np.median(mp.axis_sum(X,axis=1))
 
-def mean_gean_count(sc):
-    
+@run_query
+def mean_gene_count(X,**kwargs):
+    """
+    Computes the mean gene count
+    """
+    return mp.axis_mean(X,axis=0)
 
 
 def minimum_cells_with_gene(sc,thresh,label='total_cells'):
@@ -124,6 +129,14 @@ def minimum_genes_in_cell(sc,thresh,label='total_cells'):
     qc = np.zeros(len(x),dtype=int)
     qc[x>=thresh] = 1
     sc.cells[label] = qc
+
+def batch_background(sc,xlabel='total_umi',thresh=50):
+    for b in sorted(sc.batches):
+        print(b)
+        idx = sc.cells.index[sc.cells[b] == 1].to_numpy()
+        X = cell_total_counts(sc,cells=idx)
+        idx = idx[X<thresh]
+        print(X.shape,idx.shape,X.min(),X.max())
 
 
 def qc_residual_filter(sc,x,y,thresh=-2,label='qc_residual_filter'):

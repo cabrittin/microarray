@@ -17,15 +17,12 @@ def to_target(sc,target):
     sc.X = tsc.sum_to_target(sc.X,target,axis=1)
 
 def cells_by_vector(sc,x=None,label=None):
-    # Check if coo, if coo make sure to conver back to coo
-    to_coo = (sc.X.getformat() == 'coo')
+    if x is None: x = sc.cells[label].to_numpy()
+    sc.X = tsc.by_vector(sc.X,x,axis=1)
 
-    if x is None:
-        x = sc.cells[label].to_numpy()
-    r,c = sc.X.nonzero()
-    rD_sp = sp.csr_matrix(((1.0/x)[r], (r,c)), shape=(sc.X.shape))
-    sc.X = sc.X.multiply(rD_sp)
-    if to_coo: sc.X = sc.X.tocoo()
+def genes_by_vector(sc,x=None,label=None):
+    if x is None: x = sc.genes[label].to_numpy()
+    sc.X = tsc.by_vector(sc.X,x,axis=0)
 
 
 def seurat_log_scale(sc,scale=10000):

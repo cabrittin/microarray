@@ -38,6 +38,16 @@ class SC:
         data = np.array([4, 9, 7, 5,1])
         self.X = sp.coo_matrix((data, (row, col)), shape=(4, 4))
 
+def test_total_cell_counts():
+    from scipy.stats import gmean
+    sc = SC()
+    exp = np.array([13,7,1,5])
+    assert(np.array_equal(exp,pp.query.cell_total_counts(sc))) 
+    
+    exp = np.array([13,7])
+    assert(np.array_equal(exp,pp.query.cell_total_counts(sc,cells=[0,1]))) 
+
+
 
 def test_size_factor():
     from scipy.stats import gmean

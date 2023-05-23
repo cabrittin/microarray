@@ -45,3 +45,9 @@ def test_cells_by_vector():
     pp.scale.cells_by_vector(sc,x=vec)
     assert(np.array_equal(sc.X.data,np.array([4./13,9./13,1.,1.])))
 
+def test_genes_by_vector():
+    sc = SC()
+    vec = np.array([8.,7.,9.,20.])
+    pp.scale.genes_by_vector(sc,x=vec)
+    assert(np.array_equal(sc.X.data,np.array([0.5,1.,1.,0.25])))
+
