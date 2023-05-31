@@ -13,12 +13,13 @@ from tqdm import tqdm
 import pandas as pd
 
 def multi_res_clustering(func):
-    def inner(sc,kvals,label='comm_k_',**kwargs):
+    def inner(sc,kvals,rvals,label='comm_k_',**kwargs):
         sc.meta['cluster_res'] = []
-        for k in tqdm(kvals,desc='Comm resolutions completed:'):
-            communities = func(sc,k,**kwargs)
-            sc.cells[f'{label}{k}'] = pd.Categorical(communities)
-            sc.meta['cluster_res'].append(f'{label}{k}')
+        for k in kvals:
+            for r in tqdm(rvals,desc=f"KNN: {k} resoutions completed"): 
+                communities = func(sc,k,resolution_parameter=r,**kwargs)
+                sc.cells[f'{label}_k{k}_r{r}'] = pd.Categorical(communities)
+                sc.meta['cluster_res'].append(f'{label}{k}_{r}')
         return None
     return inner
 

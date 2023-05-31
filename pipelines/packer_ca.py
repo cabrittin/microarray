@@ -103,6 +103,29 @@ def run_hvg(sc):
     pp.plot.hvg_batch_vs_all(sc)
     plt.show() 
 
+def run_hvg_poisson_zero_count(sc):
+    scmod.select_cell_flag(sc,QC_FLAG,True)
+    reduce_to_neurons(sc,verbose=True) 
+    scale_by_size_factor(sc)
+    scmod.split_cells_by_key(sc,sc.cfg['keys']['meta_key_batch'],'batches')
+    pp.flag.hvg_batch(sc,method='poisson_zero_count_zi',num_hvg=1000,label='merge_hvg_1',keep_model=True)
+    pp.flag.hvg(sc,method='poisson_zero_count_zi',num_hvg=1000,keep_model=True)
+    pp.plot.hvg_poisson_zero_count_zi(sc,label='merge_hvg_1')
+    #plt.savefig("data/packer2019/plots/qc_hvg_poisson2.png")
+    plt.show()
+
+def run_hvg_poisson_dispersion(sc):
+    scmod.select_cell_flag(sc,QC_FLAG,True)
+    reduce_to_neurons(sc,verbose=True) 
+    scale_by_size_factor(sc)
+    scmod.split_cells_by_key(sc,sc.cfg['keys']['meta_key_batch'],'batches')
+    pp.flag.hvg_batch(sc,method='poisson_dispersion',num_hvg=1000,label='merge_hvg_2',keep_model=True)
+    pp.flag.hvg(sc,method='poisson_dispersion',num_hvg=1000,keep_model=True)
+    pp.plot.hvg_poisson_dispersion(sc,label='merge_hvg_2')
+    #plt.savefig("data/packer2019/plots/qc_hvg_poisson2.png")
+    plt.show()
+
+
 def remove_cell_cycle(sc,verbose=False):
     if verbose: print(f"# genes before CC removeal: {len(sc.genes)}")
     genes = [g[1] for g in read.into_list(sc.cfg['gene_list']['go_cell_cycle'],multi_dim=True)]
@@ -119,13 +142,15 @@ def reduce_to_neurons(sc,verbose=False):
     if verbose: print(f"# cells after neuron removal: {len(sc.cells)}") 
 
 
-
 def pca_embedding(sc):
     scmod.select_cell_flag(sc,QC_FLAG,True)
     reduce_to_neurons(sc,verbose=True) 
     scale_by_size_factor(sc)
     scmod.split_cells_by_key(sc,sc.cfg['keys']['meta_key_batch'],'batches')
-    pp.flag.hvg_batch(sc,method='mean_variance',num_hvg=1000,keep_model=False)
+    pp.flag.hvg_batch(sc,method='poisson_zero_count_zi',num_hvg=1000,label='merge_hvg_1',keep_model=False)
+    pp.flag.hvg_batch(sc,method='poisson_dispersion',num_hvg=1000,label='merge_hvg_2',keep_model=False)
+    sc.genes['merge_hvg'] = sc.genes.merge_hvg_1 | sc.genes.merge_hvg_2
+    #pp.flag.hvg_batch(sc,method='mean_variance',num_hvg=1000,keep_model=False)
     remove_cell_cycle(sc,verbose=True)
     #sc.X = pp.scale.log1p(sc) 
     sc.X = pp.scale.standardize(sc)
@@ -190,7 +215,8 @@ def plot_umap_builds(sc):
  
 def multi_res_clustering(sc):
     k_vals = [5,15,25,35,45]
-    pp.clustering.phenograph(sc,k_vals,label='pheno_k')
+    r_vals = [0.5,0.75,1.0]
+    pp.clustering.phenograph(sc,k_vals,r_vals,label='pheno',n_jobs=12,clustering_algo='leiden')
     try:
         util.to_pickle(sc,sc.loaded_from)
         print(f"Pickle dump to {sc.loaded_from}")
@@ -200,32 +226,35 @@ def multi_res_clustering(sc):
 def plot_multi_res_clusters(sc):
     k,d = 15,25
     k_vals = [5,15,25,35]
+    r_vals = [0.5,0.75,1.0]
     umap = f'data/packer2019/umap/embedding_{k}_{d}.npy'
     U = np.load(umap)
-    fig,ax = plt.subplots(1,4,figsize=(40,10))
+    fig,ax = plt.subplots(3,4,figsize=(40,40))
     for (idx,k) in enumerate(k_vals):
-        label = f'pheno_k{k}'
-        cmap = sc.cells[label].tolist()
-        ax[idx].scatter(U[:,0],U[:,1],s=5,c=cmap,cmap='tab20')
-        ax[idx].set_xticks([])
-        ax[idx].set_yticks([])
-        ax[idx].text(0.05,0.9,f'clusters_k={k}',transform=ax[idx].transAxes,fontsize=12)
+        for (jdx,r) in enumerate(r_vals): 
+            label = f'pheno_k{k}_r{r}'
+            cmap = sc.cells[label].tolist()
+            ax[jdx,idx].scatter(U[:,0],U[:,1],s=5,c=cmap,cmap='tab20')
+            ax[jdx,idx].set_xticks([])
+            ax[jdx,idx].set_yticks([])
+            ax[jdx,idx].text(0.05,0.9,f'clusters_k={k}, res={r}',transform=ax[jdx,idx].transAxes,fontsize=12)
         #print(sorted(sc.cells['pheno_k_100'].unique().tolist()))
     
     fout = 'data/packer2019/plots/multi_pheno_clusters.png'
     plt.savefig(fout,dpi=300)
     
-    pp.plot.multi_res_clusters(sc)
-    fout = 'data/packer2019/plots/multi_pheno_clusters_ari.png'
-    plt.savefig(fout)
+    #pp.plot.multi_res_clusters(sc)
+    #fout = 'data/packer2019/plots/multi_pheno_clusters_ari.png'
+    #plt.savefig(fout)
     
     plt.show()
 
 def plot_clusters(sc):
     print(sc.X.shape)
-    k,d,cls = 15,25,25
+    k,d = 15,25
     umap = f'data/packer2019/umap/embedding_{k}_{d}.npy'
-    cls = f'pheno_k{cls}'
+    cls,res = 25,0.5 
+    cls = f'pheno_k{cls}_r{res}'
     cmap = sc.cells[cls].tolist()
     U = np.load(umap)
     fig,ax = plt.subplots(1,1,figsize=(20,20))
@@ -247,33 +276,48 @@ def assess_clusters(sc):
     from collections import defaultdict
     import random
 
-    k,d,cls = 15,25,25
-    umap = f'data/packer2019/umap/embedding_{k}_{d}.npy'
-    cls = f'pheno_k{cls}'
-    cid = sc.cells[cls].tolist()
-    cmap = sc.cells[sc.cell_key].tolist()
-    vals,counts = np.unique(cmap,return_counts=True)
-    counts = counts / counts.sum()
-    #cls_count[:,1] /= cls_count.shape(0)
-    cstore = [] 
-    for (i,v) in enumerate(vals):
-        for j in range(int(counts[i]*1000)):
-            cstore.append(v)
-    vstore = defaultdict(list)
-    for i in range(len(cmap)): vstore[cmap[i]].append(i) 
+    def compute_score(sc,cls):
+        cid = sc.cells[cls].tolist()
+        cmap = sc.cells[sc.cell_key].tolist()
+        vals,counts = np.unique(cmap,return_counts=True)
+        counts = counts / counts.sum()
+        #cls_count[:,1] /= cls_count.shape(0)
+        cstore = [] 
+        for (i,v) in enumerate(vals):
+            for j in range(int(counts[i]*1000)):
+                cstore.append(v)
+        vstore = defaultdict(list)
+        for i in range(len(cmap)): vstore[cmap[i]].append(i) 
+        
+        score = np.zeros(100)
+        tot = 5000
+        for l in range(len(score)):
+            for k in range(tot):
+                c = random.choice(cstore)
+                [i,j] = random.sample(vstore[c],2)
+                score[l] += int(cid[i] == cid[j])
+                #if cid[i] != cid[j]:
+                #    print(c,cid[i],cid[j])
+        score = score/float(tot)
+        return score 
+        print(np.mean(score),np.std(score)/10.)
     
-    score = np.zeros(100)
-    tot = 5000
-    for l in range(len(score)):
-        for k in range(tot):
-            c = random.choice(cstore)
-            [i,j] = random.sample(vstore[c],2)
-            score[l] += int(cid[i] == cid[j])
-            if cid[i] != cid[j]:
-                print(c,cid[i],cid[j])
-    score = score/float(tot)
-    print(np.mean(score),np.std(score)/10.)
-
+     
+    k_vals = [5,15,25,35]
+    r_vals = [0.5,0.75,1.0]
+    Z = np.zeros((len(r_vals),len(k_vals)))
+    for (j,k) in enumerate(k_vals):
+        for (i,r) in enumerate(r_vals):
+            cls = f'pheno_k{k}_r{r}'
+            score = compute_score(sc,cls) 
+            print(cls,np.mean(score))
+            Z[i,j] = np.mean(score)
+    
+    sns.heatmap(Z,xticklabels=k_vals,yticklabels=r_vals)
+     
+    fout = 'data/packer2019/plots/pheno_cluster_scores.png'
+    plt.savefig(fout,dpi=300)
+    plt.show()
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description=__doc__,

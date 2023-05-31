@@ -91,6 +91,19 @@ def hvg_poisson_zero_count(X,**kwargs):
     x,y = _poisson_zero_count(X) 
     return xlabel,ylabel,x,y
 
+@pp_hvg
+def hvg_poisson_zero_count_vs(X,**kwargs):
+    from sctool.pp.hvg import _poisson_zero_count_vs
+    xlabel,ylabel = 'mean(sqrt(x))','# zero UMI'
+    x,y = _poisson_zero_count_vs(X) 
+    return xlabel,ylabel,x,y
+
+@pp_hvg
+def hvg_poisson_zero_count_zi(X,**kwargs):
+    from sctool.pp.hvg import _poisson_zero_count_zi
+    xlabel,ylabel = 'exp_nz','obs_nz'
+    x,y = _poisson_zero_count_zi(X) 
+    return xlabel,ylabel,x,y
 
 
 def hvg_batch_vs_all(sc,ax=None):

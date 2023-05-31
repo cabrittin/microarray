@@ -54,7 +54,7 @@ def hvg(sc,method='mean_variance',num_hvg=1000,label='hvg',keep_model=False):
     sc.genes[label] = _hvg
     if keep_model: sc.hvg_model = model
  
-def hvg_batch(sc,method='mean_variance',num_hvg=1000,label='hvg',meta_key='batch_hvg',keep_model=False):
+def hvg_batch(sc,method='mean_variance',num_hvg=1000,label='merge_hvg',meta_key='batch_hvg',keep_model=False):
     sc.meta[meta_key] = []
     if keep_model: sc.hvg_batch_model = {} 
     sc.X = sc.X.tocsr()
@@ -66,6 +66,6 @@ def hvg_batch(sc,method='mean_variance',num_hvg=1000,label='hvg',meta_key='batch
         sc.genes[bkey] =  _hvg
         if keep_model: sc.hvg_batch_model['b'] = model
     sc.X = sc.X.tocoo()
-    hvg_.merge_batch(sc)
+    hvg_.merge_batch(sc,label=label)
 
 

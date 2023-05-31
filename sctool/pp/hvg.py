@@ -102,20 +102,23 @@ def mean_variance(X,**kwargs):
 @run_hvg
 def poisson_dispersion(X,**kwargs):
     from scipy import stats
-    x,y = _poisson_dispersion(X)
-    slope, intercept, r, p, std_err = stats.linregress(x, y)
-    resid = y - (slope* x + intercept)
+    _x,_y = _poisson_dispersion(X)
+    yr = _y>1
+    x = _x[yr]
+    y = _y[yr]
+    slope, intercept, r, p, std_err = stats.linregress(x, y=y)
+    resid = _y - (slope*_x + intercept)
     rstd = np.std(resid)
     rnorm = np.divide(resid - np.mean(resid), np.std(resid))
-
+    
     """ This is a hack to maintain consistency with the loess class""" 
     M = namedtuple('Model','predict inputs')
     I = namedtuple('inputs','x') 
     def predict(newdata):
         P = namedtuple("P","values") 
-        return P(slope * newdata + intercept)
+        return P((slope * newdata)+intercept)
     
-    model = M(predict,I(x))
+    model = M(predict,I(_x))
     idx = np.argsort(rnorm)[::-1]
     return idx, model
 
@@ -179,4 +182,58 @@ def _poisson_zero_count(X):
     num_z = X.shape[0] - mp.axis_elements(X,axis=0)
     
     return mean,num_z
+
+@run_hvg
+def poisson_zero_count_vs(X,**kwargs):
+    _x,_y = _poisson_zero_count_vs(X)
+    inlier = _x <= 2
+    x = _x[inlier]
+    y = _y[inlier]
+
+    ## Fit loess
+    model = loess(x, y, span=0.3, degree=2)
+    model.fit()
+    estimate_var = model.outputs.fitted_values
+    reg_std = np.sqrt(10 ** estimate_var)
+ 
+    ## Variance of standardized values
+    #mean = mp.axis_mean(X,axis=0) 
+    #norm_nz = np.exp(-mean+reg_std)
+
+    idx = np.argsort(y)[::-1]
+    
+    return idx, model
+
+def _poisson_zero_count_vs(_X):
+    X = _X.copy()
+    X.data = np.sqrt(X.data)
+    eps = 1e-5 
+    mean = mp.axis_mean(X,axis=0,skip_zeros=False)
+    #mean = np.log2(mean + eps) 
+    num_z = X.shape[0] - mp.axis_elements(X,axis=0)
+    return mean,num_z
+
+@run_hvg
+def poisson_zero_count_zi(X,**kwargs):
+    x,y = _poisson_zero_count_zi(X)
+    
+    ## Fit loess
+    model = loess(x, y, span=0.5, degree=2)
+    model.fit()
+    estimate_obs = model.outputs.fitted_values
+    reg_std = np.sqrt(1-estimate_obs)
+ 
+    ## Variance of standardized values
+    #mean = mp.axis_mean(X,axis=0) 
+    #norm_nz = np.exp(-mean+reg_std)
+    diff = (y-estimate_obs)/reg_std
+    idx = np.argsort(diff)[::-1]
+    
+    return idx, model
+
+def _poisson_zero_count_zi(X):
+    exp = np.exp(-mp.axis_mean(X,axis=0,skip_zeros=False))
+    #mean = np.log2(mean + eps) 
+    obs = 1 - (mp.axis_elements(X,axis=0)/float(X.shape[0]))
+    return exp,obs
 
