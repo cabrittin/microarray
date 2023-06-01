@@ -110,8 +110,9 @@ def run_hvg_poisson_zero_count(sc):
     scmod.split_cells_by_key(sc,sc.cfg['keys']['meta_key_batch'],'batches')
     pp.flag.hvg_batch(sc,method='poisson_zero_count_zi',num_hvg=1000,label='merge_hvg_1',keep_model=True)
     pp.flag.hvg(sc,method='poisson_zero_count_zi',num_hvg=1000,keep_model=True)
+    print(sc.genes['merge_hvg_1'].sum(),sc.X.shape) 
     pp.plot.hvg_poisson_zero_count_zi(sc,label='merge_hvg_1')
-    #plt.savefig("data/packer2019/plots/qc_hvg_poisson2.png")
+    plt.savefig("data/packer2019/plots/hvg_poisson_zi.png")
     plt.show()
 
 def run_hvg_poisson_dispersion(sc):
@@ -121,8 +122,9 @@ def run_hvg_poisson_dispersion(sc):
     scmod.split_cells_by_key(sc,sc.cfg['keys']['meta_key_batch'],'batches')
     pp.flag.hvg_batch(sc,method='poisson_dispersion',num_hvg=1000,label='merge_hvg_2',keep_model=True)
     pp.flag.hvg(sc,method='poisson_dispersion',num_hvg=1000,keep_model=True)
+    print(sc.genes['merge_hvg_2'].sum(),sc.X.shape) 
     pp.plot.hvg_poisson_dispersion(sc,label='merge_hvg_2')
-    #plt.savefig("data/packer2019/plots/qc_hvg_poisson2.png")
+    plt.savefig("data/packer2019/plots/hvg_poisson_dispersion.png")
     plt.show()
 
 
@@ -147,9 +149,11 @@ def pca_embedding(sc):
     reduce_to_neurons(sc,verbose=True) 
     scale_by_size_factor(sc)
     scmod.split_cells_by_key(sc,sc.cfg['keys']['meta_key_batch'],'batches')
+    print(sc.X.shape) 
     pp.flag.hvg_batch(sc,method='poisson_zero_count_zi',num_hvg=1000,label='merge_hvg_1',keep_model=False)
     pp.flag.hvg_batch(sc,method='poisson_dispersion',num_hvg=1000,label='merge_hvg_2',keep_model=False)
     sc.genes['merge_hvg'] = sc.genes.merge_hvg_1 | sc.genes.merge_hvg_2
+    print(sc.genes['merge_hvg'].sum(),sc.X.shape) 
     #pp.flag.hvg_batch(sc,method='mean_variance',num_hvg=1000,keep_model=False)
     remove_cell_cycle(sc,verbose=True)
     #sc.X = pp.scale.log1p(sc) 
