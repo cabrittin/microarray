@@ -49,8 +49,8 @@ def _hvg(sc,method='mean_variance',num_hvg=1000,label='hvg',keep_model=False):
     sc.genes[label] = model.get_flag(num_hvg)
     if keep_model: sc.hvg_model = model
  
-def hvg(sc,method='mean_variance',num_hvg=1000,label='hvg',keep_model=False):
-    _hvg,model = getattr(hvg_,method)(sc.X,num_hvg)
+def hvg(sc,method='mean_variance',num_hvg=1000,label='hvg',keep_model=False,**kwargs):
+    _hvg,model = getattr(hvg_,method)(sc.X,num_hvg,**kwargs)
     sc.genes[label] = _hvg
     if keep_model: sc.hvg_model = model
  

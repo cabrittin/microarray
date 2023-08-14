@@ -58,7 +58,7 @@ def run_hvg(func):
     return inner
 
 @run_hvg
-def mean_variance(X,**kwargs):
+def mean_variance(X,hvg_score=None,**kwargs):
     """
     Identifies highly variable genes using the Seurat3
     methodology. For details, see https://doi.org/10.1101/460147
@@ -95,6 +95,10 @@ def mean_variance(X,**kwargs):
     ## Variance of standardized values
     norm_gene_var = mp.var_of_user_standardized_values(X,reg_std,axis=0) 
     idx = np.argsort(norm_gene_var)[::-1]
+    
+    if hvg_score is not None:
+        print(idx[0])
+        hvg_score[:] = norm_gene_var
 
     return idx, model
 
